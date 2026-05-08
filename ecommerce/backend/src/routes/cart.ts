@@ -28,28 +28,23 @@ const formatCart = async (cartId: string) => {
     include: { product: { include: { images: true } } }
   });
 
-  const formattedItems = items.map(item => {
-    const rawImg = item.product.images.find(i => i.isMain) || item.product.images[0] || null;
-    const mainImage = rawImg ? { image_url: rawImg.imageUrl, is_main: rawImg.isMain, alt_text: item.product.name } : null;
-    return {
-      id: item.id,
-      product: {
-        id: item.product.id,
-        name: item.product.name,
-        slug: item.product.slug,
-        sku: item.product.id.slice(0, 8).toUpperCase(),
-        price: item.product.basePrice,
-        sale_price: item.product.basePrice !== item.product.effectivePrice ? item.product.effectivePrice : null,
-        effective_price: item.product.effectivePrice,
-        stock_quantity: item.product.stock,
-        stock_status: item.product.stock > 0 ? 'in_stock' : 'out_of_stock',
-        main_image: mainImage
-      },
-      quantity: item.quantity,
-      unit_price: item.product.effectivePrice,
-      line_total: item.product.effectivePrice * item.quantity
-    };
-  });
+  const formattedItems = items.map(item => ({
+    id: item.id,
+    product: {
+      id: item.product.id,
+      name: item.product.name,
+      slug: item.product.slug,
+      sku: item.product.id.slice(0, 8),
+      price: item.product.basePrice,
+      sale_price: item.product.basePrice !== item.product.effectivePrice ? item.product.effectivePrice : null,
+      effective_price: item.product.effectivePrice,
+      stock_status: item.product.stock > 0 ? 'in_stock' : 'out_of_stock',
+      main_image: item.product.images.find(i => i.isMain) || item.product.images[0] || null
+    },
+    quantity: item.quantity,
+    unit_price: item.product.effectivePrice,
+    line_total: item.product.effectivePrice * item.quantity
+  }));
 
   const subtotal = formattedItems.reduce((acc, item) => acc + item.line_total, 0);
   const itemCount = formattedItems.reduce((acc, item) => acc + item.quantity, 0);

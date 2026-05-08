@@ -31,69 +31,6 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/account', accountRoutes);
 app.use('/api/admin', adminRoutes);
 
-// ───────────────────────────────────────────────
-// Shipping Rates (static for now - can be made dynamic)
-// ───────────────────────────────────────────────
-app.get('/api/shipping/rates/', (req, res) => {
-  const country = req.query.country as string || 'GB';
-  const rates: any[] = [];
-  if (['GB'].includes(country)) {
-    rates.push({ id: 1, name: 'Standard UK Delivery', price: '4.99', delivery_estimate: '3-5 business days' });
-    rates.push({ id: 2, name: 'Express UK Delivery', price: '9.99', delivery_estimate: '1-2 business days' });
-  } else if (['LK'].includes(country)) {
-    rates.push({ id: 3, name: 'Local Sri Lanka Delivery', price: '2.99', delivery_estimate: '2-4 business days' });
-  } else {
-    rates.push({ id: 4, name: 'International Standard', price: '12.99', delivery_estimate: '7-14 business days' });
-    rates.push({ id: 5, name: 'International Express', price: '24.99', delivery_estimate: '3-5 business days' });
-  }
-  res.json(rates);
-});
-
-// ───────────────────────────────────────────────
-// Account addresses (stub — returns empty for now)
-// ───────────────────────────────────────────────
-app.get('/api/account/addresses/', (req, res) => {
-  res.json({ results: [], count: 0 });
-});
-
-// ───────────────────────────────────────────────
-// Account orders
-// ───────────────────────────────────────────────
-import { authenticate as authMiddleware, AuthRequest } from './middleware/auth';
-app.get('/api/account/orders/', authMiddleware, async (req: AuthRequest, res) => {
-  try {
-    const orders = await prisma.order.findMany({
-      where: { userId: req.user.id },
-      orderBy: { createdAt: 'desc' },
-      include: { items: { include: { product: true } } }
-    });
-    res.json({ results: orders, count: orders.length });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch orders' });
-  }
-});
-
-app.get('/api/account/orders/:orderNumber/', authMiddleware, async (req: AuthRequest, res): Promise<any> => {
-  try {
-    const order = await prisma.order.findUnique({
-      where: { orderNumber: req.params.orderNumber as string },
-      include: { items: { include: { product: { include: { images: true } } } } }
-    });
-    if (!order || order.userId !== req.user.id) {
-      return res.status(404).json({ error: 'Order not found' });
-    }
-    res.json(order);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch order' });
-  }
-});
-
-// Profile placeholder
-app.get('/api/account/profile/', (req, res) => {
-  res.json({});
-});
-
-
 
 // ───────────────────────────────────────────────
 // Products API

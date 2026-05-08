@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import prisma from '../prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
 
@@ -8,27 +9,10 @@ const router = Router();
 router.post('/checkout/', authenticate, async (req: AuthRequest, res): Promise<any> => {
   try {
     const userId = req.user.id;
-    const {
-      billing_full_name, billing_email, billing_phone,
-      billing_address_line_1, billing_address_line_2,
-      billing_city, billing_postal_code, billing_country,
-      // Legacy fields (kept for compatibility)
-      shippingName, shippingAddress, shippingCity, shippingCountry, shippingZip,
-      currency = 'GBP',
-      customer_note, payment_method = 'cod'
-    } = req.body;
+    const { shippingName, shippingAddress, shippingCity, shippingCountry, shippingZip, currency = 'GBP' } = req.body;
 
-    // Support both old and new field formats
-    const finalName = billing_full_name || shippingName;
-    const finalAddress = billing_address_line_1 || shippingAddress;
-    const finalCity = billing_city || shippingCity;
-    const finalCountry = billing_country || shippingCountry || 'GB';
-    const finalPostal = billing_postal_code || shippingZip || '';
-    const finalPhone = billing_phone || '';
-    const finalEmail = billing_email || '';
-
-    if (!finalName || !finalAddress || !finalCity) {
-      return res.status(400).json({ error: 'Name, address and city are required' });
+    if (!shippingName || !shippingAddress || !shippingCity) {
+      return res.status(400).json({ error: 'Shipping details are required' });
     }
 
     const cart = await prisma.cart.findUnique({
@@ -49,13 +33,11 @@ router.post('/checkout/', authenticate, async (req: AuthRequest, res): Promise<a
         userId,
         totalAmount,
         currency,
-        shippingName: finalName,
-        shippingAddress: finalAddress,
-        shippingCity: finalCity,
-        shippingCountry: finalCountry,
-        shippingZip: finalPostal,
-        shippingPhone: finalPhone,
-        shippingEmail: finalEmail,
+        shippingName,
+        shippingAddress,
+        shippingCity,
+        shippingCountry,
+        shippingZip,
         items: {
           create: cart.items.map(item => ({
             productId: item.productId,
@@ -66,24 +48,10 @@ router.post('/checkout/', authenticate, async (req: AuthRequest, res): Promise<a
       }
     });
 
-    // Decrement stock for each item
-    for (const item of cart.items) {
-      await prisma.product.update({
-        where: { id: item.productId },
-        data: { stock: { decrement: item.quantity } }
-      });
-    }
-
-    // Clear cart after order placed
+    // Clear cart
     await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
 
-    res.status(201).json({
-      order_number: order.orderNumber,
-      orderNumber: order.orderNumber,
-      message: 'Order placed successfully',
-      total: totalAmount,
-      currency
-    });
+    res.status(201).json({ orderNumber: order.orderNumber, message: 'Order placed successfully' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Checkout failed' });

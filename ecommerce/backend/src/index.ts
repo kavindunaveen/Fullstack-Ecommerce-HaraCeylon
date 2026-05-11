@@ -18,6 +18,7 @@ import cartRoutes from './routes/cart';
 import orderRoutes from './routes/orders';
 import accountRoutes from './routes/account';
 import adminRoutes from './routes/admin';
+import shippingRoutes from './routes/shipping';
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -30,6 +31,7 @@ app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/account', accountRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/shipping', shippingRoutes);
 
 
 // ───────────────────────────────────────────────
@@ -124,12 +126,20 @@ app.get('/api/products/best-sellers', async (req, res) => {
   }
 });
 
-// Product Detail — must come BEFORE /categories route to avoid slug conflict
+app.get('/api/products/categories', async (req, res) => {
+  try {
+    const categories = await prisma.category.findMany();
+    res.json({ results: categories });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch categories' });
+  }
+});
+
+// Product Detail
 app.get('/api/products/:slug', async (req, res): Promise<any> => {
   try {
     const slug = req.params.slug as string;
-    // Skip if it's actually the 'categories' sub-route
-    if (slug === 'categories') return res.status(404).json({ error: 'Not found' });
     const product = await prisma.product.findUnique({
       where: { slug },
       include: { category: true, images: true }
@@ -139,16 +149,6 @@ app.get('/api/products/:slug', async (req, res): Promise<any> => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed' });
-  }
-});
-
-app.get('/api/products/categories', async (req, res) => {
-  try {
-    const categories = await prisma.category.findMany();
-    res.json({ results: categories });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to fetch categories' });
   }
 });
 

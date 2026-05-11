@@ -137,10 +137,13 @@ function ShopContent() {
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-400 relative z-10">No Image</div>
                     )}
-                    <div className="absolute top-4 left-4 z-20">
+                    <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
                       <span className="bg-white/90 backdrop-blur text-brand-dark px-3 py-1.5 rounded-full text-[10px] font-bold tracking-wider uppercase shadow-sm">
                         {product.category_name}
                       </span>
+                      <div className="bg-brand-dark/90 backdrop-blur p-1 rounded-lg w-fit shadow-sm border border-white/10">
+                        <img src="/logo.png" alt="Hara" className="h-4 w-auto" />
+                      </div>
                     </div>
                     
                     {/* Hover Add to Cart */}

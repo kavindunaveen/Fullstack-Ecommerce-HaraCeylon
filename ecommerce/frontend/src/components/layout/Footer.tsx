@@ -12,7 +12,7 @@ export default function Footer() {
           
           <div className="lg:col-span-5 flex flex-col items-start">
             <Link href="/" className="inline-block mb-6">
-              <h2 className="font-serif text-3xl font-bold tracking-wider text-white">HARA</h2>
+              <img src="/logo.png" alt="HARA CEYLON" className="h-16 w-auto" />
             </Link>
             <p className="text-gray-400 font-light leading-relaxed max-w-md mb-8">
               Cultivating wellness and tradition, from the misty hills of Sri Lanka straight to your cherished daily ritual.

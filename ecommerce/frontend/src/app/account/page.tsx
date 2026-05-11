@@ -223,7 +223,7 @@ export default function AccountPage() {
                             <div key={idx} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-xl border border-gray-100 group-hover:border-brand-gold/20 transition-all">
                               {item.image_url_snapshot && (
                                 <img 
-                                  src={item.image_url_snapshot.startsWith('http') ? item.image_url_snapshot : `${BACKEND_URL}${item.image_url_snapshot}`} 
+                                  src={item.image_url_snapshot} 
                                   alt="" 
                                   className="w-5 h-5 object-contain" 
                                 />

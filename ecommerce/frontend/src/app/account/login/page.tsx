@@ -4,10 +4,11 @@ import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 
 export default function LoginPage() {
-  const [isLogin, setIsLogin] = useState(true);
+  const searchParams = useSearchParams();
+  const [isLogin, setIsLogin] = useState(searchParams.get('signup') !== 'true');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const setAuth = useAuthStore(s => s.setAuth);

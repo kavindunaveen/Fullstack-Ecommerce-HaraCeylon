@@ -117,7 +117,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderNum
                     <div className="w-20 h-20 bg-gray-50 rounded-2xl p-2 flex items-center justify-center shrink-0 border border-gray-100">
                       {item.image_url_snapshot && (
                         <img 
-                          src={item.image_url_snapshot.startsWith('http') ? item.image_url_snapshot : `${BACKEND_URL}${item.image_url_snapshot}`} 
+                          src={item.image_url_snapshot} 
                           alt={item.product_name_snapshot} 
                           className="w-full h-full object-contain" 
                         />

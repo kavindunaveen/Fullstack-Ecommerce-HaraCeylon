@@ -33,7 +33,17 @@ router.post('/registration/', async (req, res): Promise<any> => {
     });
 
     const tokens = generateTokens(user.id);
-    res.status(201).json({ user: { id: user.id, email: user.email }, ...tokens });
+    res.status(201).json({
+      user: {
+        id: user.id,
+        email: user.email,
+        first_name: user.firstName,
+        last_name: user.lastName,
+        role: user.role,
+        is_staff: user.role === 'ADMIN'
+      },
+      ...tokens
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Registration failed' });
@@ -58,7 +68,17 @@ router.post('/login/', async (req, res): Promise<any> => {
     }
 
     const tokens = generateTokens(user.id);
-    res.json(tokens);
+    res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        first_name: user.firstName,
+        last_name: user.lastName,
+        role: user.role,
+        is_staff: user.role === 'ADMIN'
+      },
+      ...tokens
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Login failed' });

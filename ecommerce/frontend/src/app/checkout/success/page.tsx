@@ -81,7 +81,7 @@ function SuccessContent() {
                         <div className="w-14 h-14 bg-gray-50 rounded-2xl border border-gray-100 p-1.5 flex items-center justify-center shrink-0">
                           {item.image_url_snapshot && (
                             <img 
-                              src={item.image_url_snapshot.startsWith('http') ? item.image_url_snapshot : `${BACKEND_URL}${item.image_url_snapshot}`} 
+                              src={item.image_url_snapshot} 
                               alt="" 
                               className="w-full h-full object-contain" 
                             />

@@ -4,20 +4,47 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
+import { optionalAuthenticate } from '../middleware/auth';
+
 const resolveCart = async (req: AuthRequest, res: any, next: any) => {
   try {
     let cart;
+    const sessionId = req.headers['x-session-id'] as string;
+
     if (req.user) {
+      // User is logged in
       cart = await prisma.cart.findUnique({ where: { userId: req.user.id } });
       if (!cart) {
-        cart = await prisma.cart.create({ data: { userId: req.user.id } });
+        // Check if there's a guest cart to merge or use
+        if (sessionId) {
+          cart = await prisma.cart.findUnique({ where: { sessionId } });
+          if (cart && !cart.userId) {
+            // Link guest cart to user
+            cart = await prisma.cart.update({
+              where: { id: cart.id },
+              data: { userId: req.user.id, sessionId: null }
+            });
+          }
+        }
+        
+        if (!cart) {
+          cart = await prisma.cart.create({ data: { userId: req.user.id } });
+        }
       }
     } else {
-      return res.status(401).json({ error: 'Auth required for cart' });
+      // Guest user
+      if (!sessionId) {
+        return res.status(400).json({ error: 'Session ID or Auth required for cart' });
+      }
+      cart = await prisma.cart.findUnique({ where: { sessionId } });
+      if (!cart) {
+        cart = await prisma.cart.create({ data: { sessionId } });
+      }
     }
     (req as any).cart = cart;
     next();
   } catch (error) {
+    console.error('Resolve cart error:', error);
     res.status(500).json({ error: 'Failed to resolve cart' });
   }
 };
@@ -39,7 +66,11 @@ const formatCart = async (cartId: string) => {
       sale_price: item.product.basePrice !== item.product.effectivePrice ? item.product.effectivePrice : null,
       effective_price: item.product.effectivePrice,
       stock_status: item.product.stock > 0 ? 'in_stock' : 'out_of_stock',
-      main_image: item.product.images.find(i => i.isMain) || item.product.images[0] || null
+      main_image: (item.product.images.find(i => i.isMain) || item.product.images[0]) ? {
+        image_url: (item.product.images.find(i => i.isMain) || item.product.images[0]).imageUrl,
+        is_main: (item.product.images.find(i => i.isMain) || item.product.images[0]).isMain,
+        alt_text: item.product.name
+      } : null
     },
     quantity: item.quantity,
     unit_price: item.product.effectivePrice,
@@ -58,7 +89,7 @@ const formatCart = async (cartId: string) => {
   };
 };
 
-router.get('/', authenticate, resolveCart, async (req: AuthRequest, res): Promise<any> => {
+router.get('/', optionalAuthenticate, resolveCart, async (req: AuthRequest, res): Promise<any> => {
   try {
     const cart = (req as any).cart;
     const formattedCart = await formatCart(cart.id);
@@ -69,7 +100,7 @@ router.get('/', authenticate, resolveCart, async (req: AuthRequest, res): Promis
   }
 });
 
-router.post('/add/', authenticate, resolveCart, async (req: AuthRequest, res): Promise<any> => {
+router.post('/add/', optionalAuthenticate, resolveCart, async (req: AuthRequest, res): Promise<any> => {
   try {
     const cart = (req as any).cart;
     const { product_id, quantity = 1 } = req.body;
@@ -99,7 +130,7 @@ router.post('/add/', authenticate, resolveCart, async (req: AuthRequest, res): P
   }
 });
 
-router.patch('/update/:itemId/', authenticate, async (req: AuthRequest, res): Promise<any> => {
+router.patch('/update/:itemId/', optionalAuthenticate, async (req: AuthRequest, res): Promise<any> => {
   try {
     const { quantity } = req.body;
     const itemId = req.params.itemId as string;
@@ -123,7 +154,7 @@ router.patch('/update/:itemId/', authenticate, async (req: AuthRequest, res): Pr
   }
 });
 
-router.delete('/remove/:itemId/', authenticate, async (req: AuthRequest, res): Promise<any> => {
+router.delete('/remove/:itemId/', optionalAuthenticate, async (req: AuthRequest, res): Promise<any> => {
   try {
     const itemId = req.params.itemId as string;
     const item = await prisma.cartItem.findUnique({ where: { id: itemId } });
@@ -138,7 +169,7 @@ router.delete('/remove/:itemId/', authenticate, async (req: AuthRequest, res): P
   }
 });
 
-router.delete('/clear/', authenticate, resolveCart, async (req: AuthRequest, res): Promise<any> => {
+router.delete('/clear/', optionalAuthenticate, resolveCart, async (req: AuthRequest, res): Promise<any> => {
   try {
     const cart = (req as any).cart;
     await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });

@@ -66,4 +66,42 @@ router.patch('/user/', authenticate, async (req: AuthRequest, res): Promise<any>
   }
 });
 
+// Get User Orders
+router.get('/orders/', authenticate, async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const orders = await prisma.order.findMany({
+      where: { userId: req.user.id },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        items: {
+          include: {
+            product: {
+              include: { images: true }
+            }
+          }
+        }
+      }
+    });
+
+    // Format for frontend
+    const formattedOrders = orders.map(order => ({
+      order_number: order.orderNumber,
+      order_status: order.status,
+      created_at: order.createdAt,
+      grand_total: order.totalAmount,
+      items: order.items.map(item => ({
+        product_name_snapshot: item.product.name,
+        image_url_snapshot: item.product.images.find(i => i.isMain)?.imageUrl || item.product.images[0]?.imageUrl,
+        quantity: item.quantity,
+        price: item.price
+      }))
+    }));
+
+    res.json(formattedOrders);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
 export default router;

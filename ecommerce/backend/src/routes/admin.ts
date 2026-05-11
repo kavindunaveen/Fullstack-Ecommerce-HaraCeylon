@@ -186,4 +186,46 @@ router.delete('/products/:id', authenticate, requireAdmin, async (req: AuthReque
   }
 });
 
+// Admin Users List
+router.get('/users', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        createdAt: true,
+        _count: { select: { orders: true } }
+      }
+    });
+    res.json({ users });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// Admin Update User Role
+router.patch('/users/:id/role', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const id = req.params.id as string;
+    const { role } = req.body;
+    
+    if (!['CUSTOMER', 'ADMIN'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+
+    const user = await prisma.user.update({
+      where: { id },
+      data: { role },
+      select: { id: true, email: true, role: true }
+    });
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update user role' });
+  }
+});
+
 export default router;

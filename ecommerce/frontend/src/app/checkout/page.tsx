@@ -118,12 +118,17 @@ export default function CheckoutPage() {
     toast.success('Address applied');
   };
 
-  // Redirect if cart is empty (but not if we just placed an order)
+  // Redirect if cart is empty or user is not logged in
   useEffect(() => {
+    if (!isAuthenticated) {
+      toast.error('Please login to proceed to checkout');
+      router.push('/account/login?redirect=/checkout');
+      return;
+    }
     if (cart && cart.items.length === 0 && !placingOrder) {
       router.push('/products');
     }
-  }, [cart, router, placingOrder]);
+  }, [cart, router, placingOrder, isAuthenticated]);
 
   // Fetch shipping rates when billing country changes
   useEffect(() => {

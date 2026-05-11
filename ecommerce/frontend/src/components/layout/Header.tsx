@@ -1,19 +1,25 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { Search, ShoppingBag, User, Menu, X } from 'lucide-react';
-import { useCartStore, useAuthStore } from '@/lib/store';
+import { Search, ShoppingBag, User, Menu, X, LogOut, Package, Settings, ChevronDown, Loader2 } from 'lucide-react';
+import { useCartStore, useAuthStore, useCurrencyStore } from '@/lib/store';
 import { usePathname, useRouter } from 'next/navigation';
+import { productsApi } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Header() {
   const { cart, toggleCart } = useCartStore();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user, clearAuth } = useAuthStore();
+  const { formatPrice } = useCurrencyStore();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -23,30 +29,52 @@ export default function Header() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Close search when route changes
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(e.target as Node)) {
+        setAccountOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Close everything on route change
   useEffect(() => {
     setSearchOpen(false);
+    setMobileOpen(false);
+    setAccountOpen(false);
     setSearchQuery('');
   }, [pathname]);
 
-  // Focus input when search opens
+  // Live Search Logic
   useEffect(() => {
-    if (searchOpen) {
-      setTimeout(() => searchInputRef.current?.focus(), 100);
+    if (!searchQuery.trim() || searchQuery.length < 2) {
+      setSearchResults([]);
+      return;
     }
-  }, [searchOpen]);
 
-  // Close search on Escape key
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setSearchOpen(false);
-        setSearchQuery('');
+    const timer = setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const res = await productsApi.list({ search: searchQuery });
+        setSearchResults(res.data.results?.slice(0, 5) || []);
+      } catch (err) {
+        console.error('Search error:', err);
+      } finally {
+        setSearchLoading(false);
       }
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, []);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleLogout = () => {
+    clearAuth();
+    router.push('/');
+    setAccountOpen(false);
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,10 +120,10 @@ export default function Header() {
 
           {/* Logo */}
           <Link href="/" className="flex-shrink-0 relative group">
-            <h1 className={`font-serif text-2xl md:text-3xl font-bold tracking-wider transition-colors ${isHome && !scrolled ? 'text-white' : 'text-brand-dark'}`}>
-              HARA
+            <h1 className={`font-serif text-2xl md:text-3xl font-black tracking-tight transition-colors ${isHome && !scrolled ? 'text-white' : 'text-brand-dark'}`}>
+              HARA <span className="text-brand-gold italic font-light">CEYLON</span>
             </h1>
-            <div className="absolute -bottom-1 left-1/2 w-0 h-[2px] bg-brand-gold transition-all duration-300 group-hover:w-full group-hover:-translate-x-1/2" />
+            <div className="absolute -bottom-1 left-0 w-0 h-[2px] bg-brand-gold transition-all duration-300 group-hover:w-full" />
           </Link>
 
           {/* Right Actions */}
@@ -109,13 +137,88 @@ export default function Header() {
               <Search strokeWidth={1.5} size={20} />
             </button>
 
-            {/* Account */}
-            <Link
-              href={isAuthenticated ? '/account' : '/account/login'}
-              className={`hidden sm:flex p-2 transition-colors hover:text-brand-gold ${iconColor}`}
-            >
-              <User strokeWidth={1.5} size={20} />
-            </Link>
+            {/* Account Dropdown */}
+            <div className="relative" ref={accountMenuRef}>
+              <button
+                onMouseEnter={() => !mobileOpen && setAccountOpen(true)}
+                onClick={() => setAccountOpen(v => !v)}
+                className={`p-2 transition-colors hover:text-brand-gold flex items-center gap-1 ${iconColor} ${accountOpen ? 'text-brand-gold' : ''}`}
+              >
+                <User strokeWidth={1.5} size={20} />
+                {isAuthenticated && user && (
+                  <ChevronDown size={12} className={`transition-transform duration-300 ${accountOpen ? 'rotate-180' : ''}`} />
+                )}
+              </button>
+
+              <AnimatePresence>
+                {accountOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute right-0 mt-3 w-64 bg-white rounded-[1.5rem] shadow-2xl border border-gray-100 overflow-hidden z-[110]"
+                    onMouseLeave={() => setAccountOpen(false)}
+                  >
+                    {(!isAuthenticated || !user) ? (
+                      <div className="p-5 space-y-4">
+                        <div className="text-center pb-2">
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Welcome</p>
+                          <p className="text-sm text-gray-600 font-medium">Log in to your account</p>
+                        </div>
+                        <Link 
+                          href="/account/login" 
+                          className="block w-full py-3 bg-brand-dark text-white rounded-xl text-center text-xs font-bold uppercase tracking-widest hover:bg-brand-gold transition-colors"
+                        >
+                          Sign In
+                        </Link>
+                        <Link 
+                          href="/account/login?signup=true" 
+                          className="block w-full py-3 bg-gray-50 text-brand-dark border border-gray-100 rounded-xl text-center text-xs font-bold uppercase tracking-widest hover:bg-gray-100 transition-colors"
+                        >
+                          Create Account
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="p-2">
+                        <div className="px-4 py-3 mb-2 border-b border-gray-50">
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-1">Logged in as</p>
+                          <p className="text-sm font-bold text-brand-dark truncate">{user?.first_name} {user?.last_name}</p>
+                          <p className="text-[11px] text-gray-400 truncate">{user?.email}</p>
+                        </div>
+                        
+                        <Link href="/account" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 text-gray-700 transition-colors group">
+                          <Package size={18} className="text-gray-400 group-hover:text-brand-gold" />
+                          <span className="text-sm font-medium">My Orders</span>
+                        </Link>
+                        
+                        <Link href="/account/profile" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 text-gray-700 transition-colors group">
+                          <User size={18} className="text-gray-400 group-hover:text-brand-gold" />
+                          <span className="text-sm font-medium">Profile Settings</span>
+                        </Link>
+
+                        {user?.is_staff && (
+                          <Link href="/admin" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-brand-gold/5 text-brand-gold transition-colors group">
+                            <Settings size={18} className="group-hover:rotate-45 transition-transform" />
+                            <span className="text-sm font-bold">Admin Dashboard</span>
+                          </Link>
+                        )}
+
+                        <div className="mt-2 pt-2 border-t border-gray-50">
+                          <button 
+                            onClick={handleLogout}
+                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 text-red-500 transition-colors group"
+                          >
+                            <LogOut size={18} />
+                            <span className="text-sm font-bold">Logout</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
             {/* Cart */}
             <button
@@ -133,7 +236,6 @@ export default function Header() {
         </div>
       </header>
 
-      {/* ── Search Overlay ────────────────────────────────── */}
       <AnimatePresence>
         {searchOpen && (
           <>
@@ -173,9 +275,9 @@ export default function Header() {
                     <button
                       type="button"
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 transition-colors"
+                      className="absolute right-5 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-100 rounded-full text-gray-400"
                     >
-                      <X size={18} />
+                      {searchLoading ? <Loader2 className="animate-spin" size={16} /> : <X size={16} />}
                     </button>
                   )}
                 </div>
@@ -193,10 +295,59 @@ export default function Header() {
                     Search →
                   </button>
                 </div>
+              </form>
 
-                {/* Quick Links */}
-                <div className="mt-6 flex flex-wrap gap-2">
-                  <span className="text-xs text-gray-400 font-medium mr-1">Popular:</span>
+              {/* Live Results Dropdown */}
+              <AnimatePresence mode="wait">
+                {searchResults.length > 0 && searchQuery && (
+                  <motion.div
+                    key="results"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="max-w-3xl mx-auto mt-6 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden"
+                  >
+                    <div className="p-2">
+                      <div className="px-4 py-3 border-b border-gray-50 mb-1 flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Product Suggestions</span>
+                        <span className="text-[10px] font-bold text-gray-300">{searchResults.length} results</span>
+                      </div>
+                      {searchResults.map((p) => (
+                        <Link
+                          key={p.id}
+                          href={`/products/${p.slug}`}
+                          onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
+                          className="flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-gray-50 transition-colors group"
+                        >
+                          <div className="w-12 h-12 bg-gray-50 rounded-lg p-1 border border-gray-100 flex items-center justify-center shrink-0">
+                            {p.main_image?.image_url && (
+                              <img src={p.main_image.image_url} alt="" className="w-full h-full object-contain" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-gray-900 group-hover:text-brand-gold transition-colors truncate">{p.name}</p>
+                            <p className="text-xs text-gray-400 font-medium">{p.category_name}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-black text-brand-dark">{formatPrice(Number(p.effective_price))}</p>
+                          </div>
+                        </Link>
+                      ))}
+                      <button 
+                        onClick={handleSearch}
+                        className="w-full text-center py-3 text-xs font-bold text-gray-400 hover:text-brand-gold transition-colors uppercase tracking-widest mt-1"
+                      >
+                        View all results
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Quick Links */}
+              {(!searchQuery || searchResults.length === 0) && (
+                <div className="max-w-3xl mx-auto mt-6 flex flex-wrap gap-2">
+                  <span className="text-xs text-gray-400 font-medium mr-1 py-1.5">Popular:</span>
                   {['Black Tea', 'Green Tea', 'Arabica Coffee', 'Ceylon'].map(term => (
                     <button
                       key={term}
@@ -206,13 +357,13 @@ export default function Header() {
                         setSearchOpen(false);
                         setSearchQuery('');
                       }}
-                      className="text-xs px-3 py-1.5 bg-gray-100 hover:bg-brand-gold/10 hover:text-brand-gold text-gray-600 rounded-full transition-colors font-medium"
+                      className="text-xs px-3 py-1.5 bg-gray-50 hover:bg-brand-gold/10 hover:text-brand-gold text-gray-600 rounded-full transition-colors font-medium border border-gray-100"
                     >
                       {term}
                     </button>
                   ))}
                 </div>
-              </form>
+              )}
             </motion.div>
           </>
         )}
@@ -232,7 +383,10 @@ export default function Header() {
               className="fixed top-0 left-0 bottom-0 w-4/5 max-w-sm bg-white z-[102] flex flex-col"
             >
               <div className="p-6 flex items-center justify-between border-b border-gray-100">
-                <span className="font-serif text-2xl font-bold text-brand-dark">HARA</span>
+                <div className="flex flex-col">
+                  <span className="font-serif text-2xl font-black text-brand-dark leading-none">HARA</span>
+                  <span className="text-[10px] font-bold text-brand-gold tracking-[0.4em] uppercase mt-1">Ceylon</span>
+                </div>
                 <button onClick={() => setMobileOpen(false)} className="p-2 text-gray-500 hover:text-brand-dark rounded-full bg-gray-50">
                   <X size={20} />
                 </button>

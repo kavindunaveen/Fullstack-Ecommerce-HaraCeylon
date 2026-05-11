@@ -15,10 +15,20 @@ const api = axios.create({
 // Inject JWT access token from localStorage on every request
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
+    // Auth token
     const token = localStorage.getItem('access_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // Guest session ID
+    let sessionId = localStorage.getItem('session_id');
+    if (!sessionId) {
+      sessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      localStorage.setItem('session_id', sessionId);
+    }
+    config.headers['X-Session-ID'] = sessionId;
+
     const currency = localStorage.getItem('currency') || 'GBP';
     config.headers['X-Currency'] = currency;
     const language = localStorage.getItem('language') || 'en';

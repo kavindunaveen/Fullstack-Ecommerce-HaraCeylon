@@ -2,6 +2,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { checkoutApi } from '@/lib/api';
+import { useCurrencyStore } from '@/lib/store';
 import Link from 'next/link';
 import { 
   CheckCircle2, Package, ArrowRight, ShoppingBag, 
@@ -17,6 +18,7 @@ function SuccessContent() {
   const orderNumber = searchParams.get('order');
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const { formatPrice } = useCurrencyStore();
 
   useEffect(() => {
     if (orderNumber) {
@@ -92,7 +94,7 @@ function SuccessContent() {
                           <p className="text-xs text-gray-400">Quantity: {item.quantity}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-black text-brand-dark">£{item.total_price}</p>
+                          <p className="text-sm font-black text-brand-dark">{formatPrice(Number(item.total_price))}</p>
                         </div>
                       </div>
                     ))}
@@ -190,16 +192,6 @@ function SuccessContent() {
           </div>
         </div>
       </div>
-
-      <style jsx global>{`
-        @keyframes bounce-slow {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-10px); }
-        }
-        .animate-bounce-slow {
-          animation: bounce-slow 3s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   );
 }

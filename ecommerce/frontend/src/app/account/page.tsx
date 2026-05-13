@@ -3,15 +3,12 @@ import { useEffect, useState } from 'react';
 import { useAuthStore, useCurrencyStore } from '@/lib/store';
 import { accountApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
-import { 
-  Package, MapPin, User as UserIcon, LogOut, 
-  ChevronRight, ShoppingBag, Clock, CheckCircle2, 
+import {
+  Package, MapPin, User as UserIcon, LogOut,
+  ChevronRight, ShoppingBag, Clock, CheckCircle2,
   XCircle, Truck, ExternalLink
 } from 'lucide-react';
 import Link from 'next/link';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-const BACKEND_URL = API_BASE.replace('/api', '');
 
 interface Order {
   order_number: string;
@@ -50,8 +47,16 @@ export default function AccountPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  // Hydration guard — Zustand persist restores state asynchronously;
+  // wait for the first client render before checking auth.
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
     if (!isAuthenticated) {
       router.push('/account/login');
       return;
@@ -60,12 +65,21 @@ export default function AccountPage() {
       .then(res => setOrders(res.data.results || res.data || []))
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [isAuthenticated, router]);
+  }, [mounted, isAuthenticated, router]);
 
   const handleLogout = () => {
     clearAuth();
     router.push('/');
   };
+
+  // Show spinner while hydrating or while loading orders
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center pt-[80px]">
+        <div className="w-10 h-10 border-4 border-brand-gold border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (!isAuthenticated || !user) return null;
 
@@ -83,8 +97,8 @@ export default function AccountPage() {
                 Welcome back, <span className="text-white font-medium">{user.first_name}</span>. Managing your orders and profile.
               </p>
             </div>
-            <button 
-              onClick={handleLogout} 
+            <button
+              onClick={handleLogout}
               className="flex items-center gap-2 px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold text-sm transition-all border border-white/10 backdrop-blur-sm"
             >
               <LogOut size={16} /> Logout
@@ -95,12 +109,12 @@ export default function AccountPage() {
 
       <div className="container max-w-6xl mx-auto px-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
-          {/* ── Sidebar Navigation ─────────────────────────── */}
+
+          {/* Sidebar Navigation */}
           <div className="lg:col-span-3 space-y-4">
             <nav className="bg-white rounded-3xl p-6 shadow-xl shadow-black/5 border border-gray-100 flex flex-col gap-2 sticky top-28">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-2 px-3">Navigation</p>
-              
+
               <Link href="/account" className="flex items-center justify-between group p-3.5 rounded-2xl bg-brand-dark text-brand-gold font-bold transition-all shadow-lg shadow-brand-dark/10">
                 <div className="flex items-center gap-3">
                   <ShoppingBag size={20} />
@@ -108,7 +122,7 @@ export default function AccountPage() {
                 </div>
                 <ChevronRight size={16} className="opacity-50" />
               </Link>
-              
+
               <Link href="/account/addresses" className="flex items-center justify-between group p-3.5 rounded-2xl hover:bg-gray-50 text-gray-500 hover:text-brand-dark transition-all font-medium">
                 <div className="flex items-center gap-3 text-gray-400 group-hover:text-brand-gold">
                   <MapPin size={20} />
@@ -116,7 +130,7 @@ export default function AccountPage() {
                 </div>
                 <ChevronRight size={16} className="opacity-0 group-hover:opacity-100 transition-all" />
               </Link>
-              
+
               <Link href="/account/profile" className="flex items-center justify-between group p-3.5 rounded-2xl hover:bg-gray-50 text-gray-500 hover:text-brand-dark transition-all font-medium">
                 <div className="flex items-center gap-3 text-gray-400 group-hover:text-brand-gold">
                   <UserIcon size={20} />
@@ -136,10 +150,10 @@ export default function AccountPage() {
             </nav>
           </div>
 
-          {/* ── Main Content ─────────────────────────────────── */}
+          {/* Main Content */}
           <div className="lg:col-span-9 space-y-8">
-            
-            {/* Quick Stats Grid */}
+
+            {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4 group hover:border-brand-gold transition-all cursor-default">
                 <div className="w-12 h-12 rounded-2xl bg-brand-gold/10 text-brand-gold flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -156,7 +170,7 @@ export default function AccountPage() {
                 </div>
                 <div>
                   <p className="text-2xl font-black text-brand-dark">
-                    {orders.filter(o => o.order_status === 'delivered').length}
+                    {orders.filter(o => o.order_status?.toLowerCase() === 'delivered').length}
                   </p>
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Delivered</p>
                 </div>
@@ -167,14 +181,14 @@ export default function AccountPage() {
                 </div>
                 <div>
                   <p className="text-2xl font-black text-brand-dark">
-                    {orders.filter(o => !['delivered', 'cancelled'].includes(o.order_status)).length}
+                    {orders.filter(o => !['delivered', 'cancelled'].includes(o.order_status?.toLowerCase())).length}
                   </p>
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">In Progress</p>
                 </div>
               </div>
             </div>
 
-            {/* Order History Table/List */}
+            {/* Order History */}
             <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-2xl shadow-black/[0.03] border border-gray-50">
               <div className="flex items-center justify-between mb-10">
                 <div>
@@ -182,10 +196,10 @@ export default function AccountPage() {
                   <p className="text-gray-400 text-sm mt-1">Review your recent purchases and their current status.</p>
                 </div>
               </div>
-              
+
               {loading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-4">
-                  <div className="spinner w-10 h-10 border-4 border-brand-gold border-t-transparent rounded-full animate-spin"></div>
+                  <div className="w-10 h-10 border-4 border-brand-gold border-t-transparent rounded-full animate-spin" />
                   <p className="text-sm font-bold text-gray-400 animate-pulse">Loading your history...</p>
                 </div>
               ) : orders.length === 0 ? (
@@ -203,7 +217,7 @@ export default function AccountPage() {
                 <div className="space-y-6">
                   {orders.map((order) => (
                     <div key={order.order_number} className="group relative bg-white border border-gray-100 rounded-3xl p-6 md:p-8 flex flex-col md:flex-row gap-8 justify-between items-start md:items-center hover:border-brand-gold/30 hover:shadow-xl hover:shadow-brand-dark/5 transition-all duration-500">
-                      
+
                       <div className="space-y-4 flex-1">
                         <div className="flex flex-wrap items-center gap-3">
                           <span className="text-sm font-black text-brand-dark tracking-tighter bg-gray-50 px-3 py-1 rounded-lg">#{order.order_number}</span>
@@ -212,21 +226,16 @@ export default function AccountPage() {
                             {formatStatus(order.order_status)}
                           </span>
                         </div>
-                        
+
                         <div>
                           <p className="text-sm font-medium text-gray-400">Placed on <span className="text-gray-600 font-bold">{new Date(order.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</span></p>
                         </div>
 
-                        {/* Items Preview */}
                         <div className="flex flex-wrap gap-2 pt-2">
                           {order.items?.map((item: any, idx: number) => (
                             <div key={idx} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-xl border border-gray-100 group-hover:border-brand-gold/20 transition-all">
                               {item.image_url_snapshot && (
-                                <img 
-                                  src={item.image_url_snapshot} 
-                                  alt="" 
-                                  className="w-5 h-5 object-contain" 
-                                />
+                                <img src={item.image_url_snapshot} alt="" className="w-5 h-5 object-contain" />
                               )}
                               <span className="text-[11px] font-bold text-gray-700">
                                 {item.product_name_snapshot} <span className="text-gray-400 font-medium">x{item.quantity}</span>
@@ -241,7 +250,7 @@ export default function AccountPage() {
                           <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Grand Total</p>
                           <p className="text-3xl font-serif font-black text-brand-dark">{formatPrice(Number(order.grand_total))}</p>
                         </div>
-                        <Link 
+                        <Link
                           href={`/account/orders/${order.order_number}`}
                           className="flex items-center gap-2 text-xs font-bold text-brand-gold hover:text-brand-dark transition-all px-4 py-2 bg-brand-gold/5 rounded-full border border-brand-gold/10 group-hover:bg-brand-gold group-hover:text-white group-hover:border-transparent"
                         >

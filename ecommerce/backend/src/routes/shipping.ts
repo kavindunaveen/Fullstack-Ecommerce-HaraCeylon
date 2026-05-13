@@ -39,20 +39,22 @@ const DOMESTIC_RATES: ShippingRate[] = [
   },
 ];
 
-router.get('/rates', (req, res) => {
+const shippingRatesHandler = (req: any, res: any) => {
   const { country } = req.query;
 
   if (!country) {
     return res.status(400).json({ error: 'Country is required' });
   }
 
-  // If country is Sri Lanka (LK), return domestic rates, else international
-  // You can expand this logic as needed
   if (country === 'LK') {
     return res.json(DOMESTIC_RATES);
   }
 
   res.json(DEFAULT_RATES);
-});
+};
+
+// Accept both /rates and /rates/ (trailing slash)
+router.get('/rates', shippingRatesHandler);
+router.get('/rates/', shippingRatesHandler);
 
 export default router;

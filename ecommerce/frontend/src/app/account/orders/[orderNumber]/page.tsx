@@ -32,8 +32,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderNum
   const router = useRouter();
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
+    if (!mounted) return;
     if (!isAuthenticated) {
       router.push('/account/login');
       return;
@@ -42,7 +46,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderNum
       .then(res => setOrder(res.data))
       .catch(() => toast.error('Could not load order details'))
       .finally(() => setLoading(false));
-  }, [isAuthenticated, orderNumber, router]);
+  }, [mounted, isAuthenticated, orderNumber, router]);
+
+  if (!mounted) return (
+    <div className="min-h-screen flex items-center justify-center pt-[80px]">
+      <div className="w-10 h-10 border-4 border-brand-gold border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   if (!isAuthenticated) return null;
 

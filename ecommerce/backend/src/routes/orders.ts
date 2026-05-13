@@ -5,7 +5,7 @@ import { authenticate, optionalAuthenticate, AuthRequest } from '../middleware/a
 const router = Router();
 
 // Checkout
-router.post('/checkout/', authenticate, async (req: AuthRequest, res): Promise<any> => {
+router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): Promise<any> => {
   try {
     const {
       billing_full_name,
@@ -30,16 +30,32 @@ router.post('/checkout/', authenticate, async (req: AuthRequest, res): Promise<a
     const sessionId = req.headers['x-session-id'] as string;
     let cart;
 
+    // Try finding by userId first if authenticated
     if (req.user) {
       cart = await prisma.cart.findUnique({
         where: { userId: req.user.id },
         include: { items: { include: { product: true } } }
       });
-    } else if (sessionId) {
-      cart = await prisma.cart.findUnique({
+    }
+
+    // If no user cart or it's empty, fallback to the sessionId cart
+    // This happens if a user adds to cart as guest, then logs in at checkout
+    if ((!cart || cart.items.length === 0) && sessionId) {
+      const sessionCart = await prisma.cart.findUnique({
         where: { sessionId },
         include: { items: { include: { product: true } } }
       });
+      if (sessionCart && sessionCart.items.length > 0) {
+        cart = sessionCart;
+        
+        // Link the guest cart to the user if they just logged in
+        if (req.user && !cart.userId) {
+          await prisma.cart.update({
+            where: { id: cart.id },
+            data: { userId: req.user.id, sessionId: null }
+          });
+        }
+      }
     }
 
     if (!cart || cart.items.length === 0) {

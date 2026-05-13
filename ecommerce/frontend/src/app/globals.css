@@ -25,6 +25,15 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 3s ease-in-out infinite;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #0A1A12;

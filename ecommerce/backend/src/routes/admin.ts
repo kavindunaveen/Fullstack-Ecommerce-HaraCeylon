@@ -228,4 +228,63 @@ router.patch('/users/:id/role', authenticate, requireAdmin, async (req: AuthRequ
   }
 });
 
+// Admin Seed Route (For testing only — requires admin auth)
+router.post('/seed', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const category1 = await prisma.category.upsert({
+      where: { slug: 'black-tea' },
+      update: {},
+      create: { name: 'Black Tea', slug: 'black-tea', description: 'Premium Ceylon Black Tea' }
+    });
+    
+    const category2 = await prisma.category.upsert({
+      where: { slug: 'green-tea' },
+      update: {},
+      create: { name: 'Green Tea', slug: 'green-tea', description: 'Organic Ceylon Green Tea' }
+    });
+
+    const product1 = await prisma.product.upsert({
+      where: { slug: 'premium-ceylon-black' },
+      update: {},
+      create: {
+        name: 'Premium Ceylon Black',
+        slug: 'premium-ceylon-black',
+        description: 'The finest black tea from the central highlands.',
+        basePrice: 15.00,
+        effectivePrice: 15.00,
+        stock: 100,
+        categoryId: category1.id,
+        isFeatured: true,
+        isBestSeller: true,
+        images: {
+          create: [{ imageUrl: '/PREMIUM-BLACK-TEA.png', isMain: true }]
+        }
+      }
+    });
+
+    const product2 = await prisma.product.upsert({
+      where: { slug: 'organic-green-tea' },
+      update: {},
+      create: {
+        name: 'Organic Green Tea',
+        slug: 'organic-green-tea',
+        description: 'Smooth and refreshing green tea.',
+        basePrice: 18.00,
+        effectivePrice: 18.00,
+        stock: 50,
+        categoryId: category2.id,
+        isNewArrival: true,
+        images: {
+          create: [{ imageUrl: '/PREMIUM-GREEN-TEA.png', isMain: true }]
+        }
+      }
+    });
+
+    res.json({ message: 'Seed successful', products: [product1, product2] });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Seed failed' });
+  }
+});
+
 export default router;

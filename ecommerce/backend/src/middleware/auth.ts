@@ -16,7 +16,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { userId: string };
+    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET as string) as { userId: string };
     const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
 
     if (!user) {
@@ -39,7 +39,7 @@ export const optionalAuthenticate = async (req: AuthRequest, res: Response, next
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { userId: string };
+    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET as string) as { userId: string };
     const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
 
     if (user) {

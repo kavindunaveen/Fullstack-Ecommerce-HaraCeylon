@@ -9,7 +9,7 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 8000;
 
-app.use(cors({ origin: true, credentials: true }));
+app.use(cors({ origin: ['http://localhost:3000', 'https://haraceylon.com'], credentials: true }));
 app.use(express.json());
 app.use(morgan('dev'));
 
@@ -149,59 +149,6 @@ app.get('/api/products/:slug', async (req, res): Promise<any> => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed' });
-  }
-});
-
-// ───────────────────────────────────────────────
-// Admin Seed Route (For testing only)
-// ───────────────────────────────────────────────
-app.post('/api/admin/seed', async (req, res) => {
-  try {
-    const category1 = await prisma.category.create({
-      data: { name: 'Black Tea', slug: 'black-tea', description: 'Premium Ceylon Black Tea' }
-    });
-    
-    const category2 = await prisma.category.create({
-      data: { name: 'Green Tea', slug: 'green-tea', description: 'Organic Ceylon Green Tea' }
-    });
-
-    const product1 = await prisma.product.create({
-      data: {
-        name: 'Premium Ceylon Black',
-        slug: 'premium-ceylon-black',
-        description: 'The finest black tea from the central highlands.',
-        basePrice: 15.00,
-        effectivePrice: 15.00,
-        stock: 100,
-        categoryId: category1.id,
-        isFeatured: true,
-        isBestSeller: true,
-        images: {
-          create: [{ imageUrl: '/PREMIUM-BLACK-TEA.png', isMain: true }]
-        }
-      }
-    });
-
-    const product2 = await prisma.product.create({
-      data: {
-        name: 'Organic Green Tea',
-        slug: 'organic-green-tea',
-        description: 'Smooth and refreshing green tea.',
-        basePrice: 18.00,
-        effectivePrice: 18.00,
-        stock: 50,
-        categoryId: category2.id,
-        isNewArrival: true,
-        images: {
-          create: [{ imageUrl: '/PREMIUM-GREEN-TEA.png', isMain: true }]
-        }
-      }
-    });
-
-    res.json({ message: 'Seed successful', products: [product1, product2] });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Seed failed' });
   }
 });
 

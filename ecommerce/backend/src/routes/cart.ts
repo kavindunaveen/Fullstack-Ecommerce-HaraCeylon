@@ -107,14 +107,24 @@ router.post('/add/', optionalAuthenticate, resolveCart, async (req: AuthRequest,
 
     if (!product_id) return res.status(400).json({ error: 'product_id is required' });
 
+    const product = await prisma.product.findUnique({ where: { id: product_id } });
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
     let item = await prisma.cartItem.findUnique({
       where: { cartId_productId: { cartId: cart.id, productId: product_id } }
     });
 
+    const currentQuantity = item ? item.quantity : 0;
+    const requestedTotal = currentQuantity + quantity;
+
+    if (product.stock < requestedTotal) {
+      return res.status(400).json({ error: `Insufficient stock. Only ${product.stock} available.` });
+    }
+
     if (item) {
       await prisma.cartItem.update({
         where: { id: item.id },
-        data: { quantity: item.quantity + quantity }
+        data: { quantity: requestedTotal }
       });
     } else {
       await prisma.cartItem.create({
@@ -130,41 +140,56 @@ router.post('/add/', optionalAuthenticate, resolveCart, async (req: AuthRequest,
   }
 });
 
-router.patch('/update/:itemId/', optionalAuthenticate, async (req: AuthRequest, res): Promise<any> => {
+router.patch('/update/:itemId/', optionalAuthenticate, resolveCart, async (req: AuthRequest, res): Promise<any> => {
   try {
     const { quantity } = req.body;
     const itemId = req.params.itemId as string;
+    const cart = (req as any).cart;
 
-    const item = await prisma.cartItem.findUnique({ where: { id: itemId } });
-    if (!item) return res.status(404).json({ error: 'Item not found' });
+    const item = await prisma.cartItem.findFirst({
+      where: { id: itemId, cartId: cart.id }
+    });
+    if (!item) return res.status(404).json({ error: 'Item not found in your cart' });
 
     if (quantity < 1) {
       await prisma.cartItem.delete({ where: { id: itemId } });
     } else {
+      // Check stock for the new quantity
+      const product = await prisma.product.findUnique({ where: { id: item.productId } });
+      if (product && product.stock < quantity) {
+        return res.status(400).json({ error: `Insufficient stock. Only ${product.stock} available.` });
+      }
+
       await prisma.cartItem.update({
         where: { id: itemId },
         data: { quantity }
       });
     }
 
-    const formattedCart = await formatCart(item.cartId);
+    const formattedCart = await formatCart(cart.id);
     res.json(formattedCart);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Failed to update cart' });
   }
 });
 
-router.delete('/remove/:itemId/', optionalAuthenticate, async (req: AuthRequest, res): Promise<any> => {
+router.delete('/remove/:itemId/', optionalAuthenticate, resolveCart, async (req: AuthRequest, res): Promise<any> => {
   try {
     const itemId = req.params.itemId as string;
-    const item = await prisma.cartItem.findUnique({ where: { id: itemId } });
-    if (!item) return res.status(404).json({ error: 'Item not found' });
+    const cart = (req as any).cart;
+
+    const item = await prisma.cartItem.findFirst({
+      where: { id: itemId, cartId: cart.id }
+    });
+    if (!item) return res.status(404).json({ error: 'Item not found in your cart' });
 
     await prisma.cartItem.delete({ where: { id: itemId } });
     
-    const formattedCart = await formatCart(item.cartId);
+    const formattedCart = await formatCart(cart.id);
     res.json(formattedCart);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Failed to remove item' });
   }
 });

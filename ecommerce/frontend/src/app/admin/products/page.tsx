@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import api from '@/lib/api';
+import api, { BACKEND_URL } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { useCurrencyStore } from '@/lib/store';
 import { Plus, Edit2, Trash2, Package, Search } from 'lucide-react';
@@ -88,7 +88,13 @@ export default function AdminProducts() {
                   <td className="p-4">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 bg-gray-50 rounded-lg overflow-hidden border border-gray-100 flex items-center justify-center p-1">
-                        {p.images?.[0] ? <img src={p.images[0].imageUrl} alt="" className="w-full h-full object-contain" /> : <Package size={20} className="text-gray-300" />}
+                        {p.images?.[0] ? (
+                          <img 
+                            src={p.images[0].imageUrl.startsWith('http') ? p.images[0].imageUrl : `${BACKEND_URL}${p.images[0].imageUrl}`} 
+                            alt="" 
+                            className="w-full h-full object-contain" 
+                          />
+                        ) : <Package size={20} className="text-gray-300" />}
                       </div>
                       <div>
                         <p className="font-bold text-brand-dark line-clamp-1">{p.name}</p>

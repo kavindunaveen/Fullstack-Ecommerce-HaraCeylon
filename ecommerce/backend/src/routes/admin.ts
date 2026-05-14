@@ -2,9 +2,34 @@ import { Router } from 'express';
 import * as bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../prisma';
+import path from 'path';
+import multer from 'multer';
 import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = Router();
+
+// Configure Multer for local storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/');
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png|webp/;
+    const mimetype = filetypes.test(file.mimetype);
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    if (mimetype && extname) return cb(null, true);
+    cb(new Error('Only images are allowed (jpeg, jpg, png, webp)'));
+  }
+});
 
 // Middleware to ensure user is an ADMIN
 const requireAdmin = (req: AuthRequest, res: any, next: any) => {
@@ -383,6 +408,19 @@ router.post('/setup-account', authenticate, requireAdmin, async (req: AuthReques
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Setup failed' });
+  }
+});
+
+// Admin Image Upload
+router.post('/upload', authenticate, requireAdmin, upload.single('image'), async (req: any, res): Promise<any> => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    
+    // Return the relative URL
+    const imageUrl = `/uploads/${req.file.filename}`;
+    res.json({ imageUrl });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Upload failed' });
   }
 });
 

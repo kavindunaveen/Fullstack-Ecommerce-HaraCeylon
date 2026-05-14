@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
 import dotenv from 'dotenv';
 import morgan from 'morgan';
 import prisma from './prisma';
@@ -7,11 +9,32 @@ import prisma from './prisma';
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 8000;
+const port = process.env.PORT || 8001;
 
-app.use(cors({ origin: ['http://localhost:3000', 'https://haraceylon.com'], credentials: true }));
+// Production CORS configuration
+const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000').split(',');
+app.use(cors({ 
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }, 
+  credentials: true 
+}));
+
 app.use(express.json());
 app.use(morgan('dev'));
+
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Serve uploaded files
+app.use('/uploads', express.static(uploadsDir));
 
 import authRoutes from './routes/auth';
 import cartRoutes from './routes/cart';
@@ -39,7 +62,15 @@ app.use('/api/shipping', shippingRoutes);
 // ───────────────────────────────────────────────
 // Helper to format a product for the frontend
 const formatProduct = (p: any, detail = false) => {
-  const formatImg = (img: any) => img ? { image_url: img.imageUrl, is_main: img.isMain, alt_text: p.name } : null;
+  const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8001';
+  const formatImg = (img: any) => {
+    if (!img) return null;
+    let url = img.imageUrl;
+    if (url && !url.startsWith('http')) {
+      url = `${BACKEND_URL}${url}`;
+    }
+    return { image_url: url, is_main: img.isMain, alt_text: p.name };
+  };
   const mainImg = p.images?.find((img: any) => img.isMain) || p.images?.[0] || null;
   const base: any = {
     id: p.id,

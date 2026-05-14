@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import api from '@/lib/api';
+import api, { BACKEND_URL } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Save, Loader2, Upload } from 'lucide-react';
@@ -14,6 +14,7 @@ export default function ProductForm() {
 
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     name: '',
@@ -63,6 +64,27 @@ export default function ProductForm() {
       toast.error('Failed to load product details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      const res = await api.post('/admin/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setFormData(prev => ({ ...prev, imageUrl: res.data.imageUrl }));
+      toast.success('Image uploaded successfully');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Upload failed');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -188,16 +210,69 @@ export default function ProductForm() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Main Image URL</label>
-              <div className="relative">
-                <input 
-                  type="text" required
-                  value={formData.imageUrl}
-                  onChange={e => setFormData({ ...formData, imageUrl: e.target.value })}
-                  className="form-control pl-10"
-                  placeholder="https://example.com/image.png"
-                />
-                <Upload className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <label className="form-label">Product Image</label>
+              <div className="space-y-4">
+                {formData.imageUrl && (
+                  <div className="relative w-full aspect-square rounded-2xl overflow-hidden bg-gray-50 border border-gray-100 shadow-inner group">
+                    <img 
+                      src={formData.imageUrl.startsWith('http') ? formData.imageUrl : `${BACKEND_URL}${formData.imageUrl}`} 
+                      alt="Preview" 
+                      className="w-full h-full object-contain"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                       <button 
+                         type="button"
+                         onClick={() => setFormData({ ...formData, imageUrl: '' })}
+                         className="bg-red-500 text-white p-2 rounded-full hover:scale-110 transition-all shadow-lg"
+                       >
+                         <ArrowLeft className="rotate-45" size={16} />
+                       </button>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="relative">
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="image-upload"
+                  />
+                  <label 
+                    htmlFor="image-upload"
+                    className={`flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${
+                      uploading ? 'bg-gray-50 border-gray-200' : 'bg-brand-gold/5 border-brand-gold/20 hover:bg-brand-gold/10 hover:border-brand-gold/40'
+                    }`}
+                  >
+                    {uploading ? (
+                      <Loader2 className="animate-spin text-brand-gold" size={32} />
+                    ) : (
+                      <Upload className="text-brand-gold" size={32} />
+                    )}
+                    <div className="text-center">
+                      <p className="text-sm font-black text-brand-dark uppercase tracking-widest">
+                        {uploading ? 'Uploading...' : 'Choose Local File'}
+                      </p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">JPEG, PNG or WebP (Max 5MB)</p>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="h-[1px] flex-1 bg-gray-100" />
+                    <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">OR USE EXTERNAL LINK</span>
+                    <div className="h-[1px] flex-1 bg-gray-100" />
+                  </div>
+                  <input 
+                    type="text"
+                    value={formData.imageUrl}
+                    onChange={e => setFormData({ ...formData, imageUrl: e.target.value })}
+                    className="form-control"
+                    placeholder="https://example.com/image.png"
+                  />
+                </div>
               </div>
             </div>
           </div>

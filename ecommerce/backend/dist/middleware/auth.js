@@ -13,7 +13,7 @@ const authenticate = async (req, res, next) => {
     }
     const token = authHeader.split(' ')[1];
     try {
-        const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
+        const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_ACCESS_SECRET);
         const user = await prisma_1.default.user.findUnique({ where: { id: decoded.userId } });
         if (!user) {
             return res.status(401).json({ error: 'Unauthorized: Invalid token' });
@@ -33,7 +33,7 @@ const optionalAuthenticate = async (req, res, next) => {
     }
     const token = authHeader.split(' ')[1];
     try {
-        const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
+        const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_ACCESS_SECRET);
         const user = await prisma_1.default.user.findUnique({ where: { id: decoded.userId } });
         if (user) {
             req.user = user;

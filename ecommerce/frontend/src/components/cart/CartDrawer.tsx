@@ -71,9 +71,9 @@ export default function CartDrawer() {
                     <ShoppingBag size={32} strokeWidth={1.5} className="text-gray-300" />
                   </div>
                   <p className="font-light text-lg">Your bag is empty.</p>
-                  <button onClick={closeCart} className="text-brand-gold font-medium hover:underline">
+                  <Link href="/products" onClick={closeCart} className="text-brand-gold font-medium hover:underline">
                     Continue Shopping
-                  </button>
+                  </Link>
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">

@@ -1,8 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.DOMESTIC_RATES = exports.DEFAULT_RATES = void 0;
 const express_1 = require("express");
 const router = (0, express_1.Router)();
-const DEFAULT_RATES = [
+exports.DEFAULT_RATES = [
     {
         id: 1,
         name: 'Standard International Shipping',
@@ -16,7 +17,7 @@ const DEFAULT_RATES = [
         delivery_estimate: '3-5 business days',
     },
 ];
-const DOMESTIC_RATES = [
+exports.DOMESTIC_RATES = [
     {
         id: 3,
         name: 'Standard Local Delivery',
@@ -36,9 +37,9 @@ const shippingRatesHandler = (req, res) => {
         return res.status(400).json({ error: 'Country is required' });
     }
     if (country === 'LK') {
-        return res.json(DOMESTIC_RATES);
+        return res.json(exports.DOMESTIC_RATES);
     }
-    res.json(DEFAULT_RATES);
+    res.json(exports.DEFAULT_RATES);
 };
 // Accept both /rates and /rates/ (trailing slash)
 router.get('/rates', shippingRatesHandler);

@@ -1,10 +1,11 @@
 import { Router } from 'express';
-import bcrypt from 'bcryptjs';
+import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import prisma from '../prisma';
 import rateLimit from 'express-rate-limit';
 
 const router = Router();
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Rate limiter for authentication routes
 const authLimiter = rateLimit({
@@ -31,62 +32,41 @@ const generateTokens = async (userId: string) => {
   return { access, refresh };
 };
 
-// Register
-router.post('/registration/', authLimiter, async (req, res): Promise<any> => {
+// Google SSO Login/Registration
+router.post('/google/', authLimiter, async (req, res): Promise<any> => {
   try {
-    const { email, password, firstName, lastName } = req.body;
-    const trimmedEmail = email?.trim();
-    const trimmedPassword = password?.trim();
-
-    if (!trimmedEmail || !trimmedPassword) {
-      return res.status(400).json({ error: 'Email and password are required' });
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ error: 'Google credential is required' });
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email: trimmedEmail } });
-    if (existingUser) {
-      return res.status(400).json({ error: 'Email is already in use' });
+    // Verify the JWT token sent from the frontend Google button
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email) {
+      return res.status(400).json({ error: 'Invalid Google token payload' });
     }
 
-    const passwordHash = await bcrypt.hash(trimmedPassword, 10);
-    const user = await prisma.user.create({
-      data: { email: trimmedEmail, passwordHash, firstName, lastName }
-    });
+    const { email, given_name, family_name } = payload;
 
-    const tokens = await generateTokens(user.id);
-    res.status(201).json({
-      user: {
-        id: user.id,
-        email: user.email,
-        first_name: user.firstName,
-        last_name: user.lastName,
-        role: user.role,
-        is_staff: user.role === 'ADMIN'
-      },
-      ...tokens
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Registration failed' });
-  }
-});
-
-// Login
-router.post('/login/', authLimiter, async (req, res): Promise<any> => {
-  try {
-    const { email, password } = req.body;
-    const trimmedEmail = email?.trim();
-    const trimmedPassword = password?.trim();
-
-    const user = await prisma.user.findUnique({ where: { email: trimmedEmail } });
+    // Find the user, or auto-register them if this is their first time
+    let user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      user = await prisma.user.create({
+        data: {
+          email,
+          firstName: given_name || '',
+          lastName: family_name || '',
+          // passwordHash is now optional and omitted for Google users
+        }
+      });
     }
 
-    const isMatch = await bcrypt.compare(trimmedPassword, user.passwordHash);
-    if (!isMatch) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
+    // Generate our system's access & refresh tokens
     const tokens = await generateTokens(user.id);
     res.json({
       user: {
@@ -100,8 +80,8 @@ router.post('/login/', authLimiter, async (req, res): Promise<any> => {
       ...tokens
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Login failed' });
+    console.error('Google auth error:', error);
+    res.status(500).json({ error: 'Google authentication failed' });
   }
 });
 

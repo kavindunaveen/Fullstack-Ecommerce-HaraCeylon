@@ -11,6 +11,11 @@ interface DashboardStats {
   active_orders: number;
   total_customers: number;
   low_stock_items: number;
+  total_orders: number;
+  today_orders: number;
+  new_customers_today: number;
+  pending_orders: number;
+  low_stock_products?: any[];
   recent_orders: {
     order_number: string;
     customer_name: string;
@@ -125,9 +130,9 @@ export default function AdminDashboard() {
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <h2 className="text-lg font-serif font-bold text-gray-900 mb-4">Low Stock Alerts</h2>
-            {stats.low_stock_products?.length > 0 ? (
+            {(stats.low_stock_products?.length ?? 0) > 0 ? (
               <ul className="space-y-3">
-                {stats.low_stock_products.map((p: any) => (
+                {stats.low_stock_products?.map((p: any) => (
                   <li key={p.id} className="flex justify-between items-center text-sm p-3 bg-red-50 text-red-700 rounded-lg">
                     <span className="font-bold line-clamp-1">{p.name}</span>
                     <span className="flex-shrink-0 bg-red-100 px-2 py-1 rounded text-xs">{p.stock_quantity} left</span>

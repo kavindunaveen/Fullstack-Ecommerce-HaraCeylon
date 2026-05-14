@@ -17,21 +17,11 @@ import { useCartStore, useCurrencyStore, useAuthStore } from '@/lib/store';
 import { checkoutApi, accountApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { ShieldCheck, Truck, Lock, Tag, ChevronDown, ChevronUp } from 'lucide-react';
+import { ShieldCheck, Truck, Lock, Tag, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
 import type { CartItem } from '@/lib/store';
+import AddressFields from '@/components/checkout/AddressFields';
 
-const COUNTRIES = [
-  { code: 'GB', name: 'United Kingdom' },
-  { code: 'US', name: 'United States' },
-  { code: 'LK', name: 'Sri Lanka' },
-  { code: 'AE', name: 'United Arab Emirates' },
-  { code: 'AU', name: 'Australia' },
-  { code: 'CA', name: 'Canada' },
-  { code: 'DE', name: 'Germany' },
-  { code: 'FR', name: 'France' },
-  { code: 'IN', name: 'India' },
-  { code: 'SG', name: 'Singapore' },
-];
+
 
 interface ShippingRate {
   id: number;
@@ -73,6 +63,7 @@ export default function CheckoutPage() {
     coupon_code: '',
     customer_note: '',
     terms_accepted: false,
+    save_address: true,
     
     // Account Creation
     create_account: false,
@@ -118,17 +109,12 @@ export default function CheckoutPage() {
     toast.success('Address applied');
   };
 
-  // Redirect if cart is empty or user is not logged in
+  // Redirect if cart is empty
   useEffect(() => {
-    if (!isAuthenticated) {
-      toast.error('Please login to proceed to checkout');
-      router.push('/account/login?redirect=/checkout');
-      return;
-    }
     if (cart && cart.items.length === 0 && !placingOrder) {
       router.push('/products');
     }
-  }, [cart, router, placingOrder, isAuthenticated]);
+  }, [cart, router, placingOrder]);
 
   // Fetch shipping rates when billing country changes
   useEffect(() => {
@@ -166,6 +152,10 @@ export default function CheckoutPage() {
       ...f,
       [name]: type === 'checkbox' ? checked : value,
     }));
+  };
+
+  const handleSelectChange = (name: string, value: string) => {
+    setForm(f => ({ ...f, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -324,40 +314,30 @@ export default function CheckoutPage() {
                   />
                 </div>
               </div>
-
-              {/* Create Account Toggle */}
-              <div className="mt-6 pt-6 border-t border-gray-100">
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    name="create_account"
-                    checked={form.create_account}
-                    onChange={handleChange}
-                    className="w-4 h-4 accent-brand-gold rounded"
-                  />
-                  <span className="text-sm font-medium text-gray-700 group-hover:text-brand-dark transition-colors">
-                    Create an account for faster checkout next time
-                  </span>
-                </label>
-                
-                {form.create_account && (
-                  <div className="mt-4">
-                    <label className="form-label">Account Password *</label>
-                    <input
-                      required={form.create_account}
-                      type="password"
-                      name="password"
-                      value={form.password}
-                      onChange={handleChange}
-                      className="form-control"
-                      placeholder="Enter a secure password"
-                      minLength={6}
-                    />
-                    <p className="text-xs text-gray-400 mt-2">Your email address will be your username.</p>
-                  </div>
-                )}
               </div>
-            </div>
+
+            {/* Saved Addresses Selection */}
+            {isAuthenticated && savedAddresses.length > 0 && (
+              <div className="mb-8 bg-brand-dark/5 p-6 rounded-2xl border border-brand-gold/20">
+                <div className="flex items-center gap-3 mb-4 text-brand-dark">
+                  <MapPin size={20} className="text-brand-gold" />
+                  <h3 className="font-bold text-sm uppercase tracking-widest">Use a saved address</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {savedAddresses.map((addr) => (
+                    <button
+                      key={addr.id}
+                      type="button"
+                      onClick={() => applySavedAddress(addr)}
+                      className="text-left p-4 rounded-xl border border-gray-200 bg-white hover:border-brand-gold hover:shadow-md transition-all group"
+                    >
+                      <p className="text-[11px] font-black text-brand-dark mb-1">{addr.full_name}</p>
+                      <p className="text-[10px] text-gray-500 line-clamp-1">{addr.address_line_1}, {addr.city}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Billing / Shipping Address */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
@@ -386,29 +366,12 @@ export default function CheckoutPage() {
                     placeholder="Apartment, suite, etc."
                   />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">City *</label>
-                  <input
-                    required
-                    type="text"
-                    name="billing_city"
-                    value={form.billing_city}
-                    onChange={handleChange}
-                    className="form-control"
-                    placeholder="London"
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">State / County <span className="text-gray-400 normal-case font-normal">(optional)</span></label>
-                  <input
-                    type="text"
-                    name="billing_state"
-                    value={form.billing_state}
-                    onChange={handleChange}
-                    className="form-control"
-                    placeholder="England"
-                  />
-                </div>
+                <AddressFields 
+                  prefix="billing" 
+                  formData={form} 
+                  onChange={handleSelectChange} 
+                />
+
                 <div className="form-group">
                   <label className="form-label">Postcode *</label>
                   <input
@@ -421,21 +384,25 @@ export default function CheckoutPage() {
                     placeholder="SW1A 1AA"
                   />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Country *</label>
-                  <select
-                    required
-                    name="billing_country"
-                    value={form.billing_country}
-                    onChange={handleChange}
-                    className="form-control"
-                  >
-                    {COUNTRIES.map(c => (
-                      <option key={c.code} value={c.code}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
               </div>
+
+              {/* Save Address Toggle (only for logged in) */}
+              {isAuthenticated && (
+                <div className="mt-6 pt-6 border-t border-gray-100">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      name="save_address"
+                      checked={form.save_address}
+                      onChange={handleChange}
+                      className="w-4 h-4 accent-brand-gold rounded"
+                    />
+                    <span className="text-sm font-medium text-gray-700 group-hover:text-brand-dark transition-colors">
+                      Save this address to my profile for future orders
+                    </span>
+                  </label>
+                </div>
+              )}
 
               {/* Ship to Different Address Toggle */}
               <label className="flex items-center gap-3 mt-6 cursor-pointer group">
@@ -467,19 +434,14 @@ export default function CheckoutPage() {
                     <label className="form-label">Address Line 2</label>
                     <input type="text" name="shipping_address_line_2" value={form.shipping_address_line_2} onChange={handleChange} className="form-control" />
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">City *</label>
-                    <input required type="text" name="shipping_city" value={form.shipping_city} onChange={handleChange} className="form-control" />
-                  </div>
+                  <AddressFields 
+                    prefix="shipping" 
+                    formData={form} 
+                    onChange={handleSelectChange} 
+                  />
                   <div className="form-group">
                     <label className="form-label">Postcode *</label>
                     <input required type="text" name="shipping_postal_code" value={form.shipping_postal_code} onChange={handleChange} className="form-control" />
-                  </div>
-                  <div className="form-group md:col-span-2">
-                    <label className="form-label">Country *</label>
-                    <select required name="shipping_country" value={form.shipping_country} onChange={handleChange} className="form-control">
-                      {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
-                    </select>
                   </div>
                 </div>
               )}

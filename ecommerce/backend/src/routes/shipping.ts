@@ -9,7 +9,7 @@ interface ShippingRate {
   delivery_estimate: string | null;
 }
 
-const DEFAULT_RATES: ShippingRate[] = [
+export const DEFAULT_RATES: ShippingRate[] = [
   {
     id: 1,
     name: 'Standard International Shipping',
@@ -24,7 +24,7 @@ const DEFAULT_RATES: ShippingRate[] = [
   },
 ];
 
-const DOMESTIC_RATES: ShippingRate[] = [
+export const DOMESTIC_RATES: ShippingRate[] = [
   {
     id: 3,
     name: 'Standard Local Delivery',

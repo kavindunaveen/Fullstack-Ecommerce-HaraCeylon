@@ -1,52 +1,38 @@
 'use client';
-import { useState, Suspense } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { authApi } from '@/lib/api';
+import { GoogleLogin } from '@react-oauth/google';
 import { useAuthStore } from '@/lib/store';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 
 function LoginContent() {
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '';
-  const [isLogin, setIsLogin] = useState(searchParams.get('signup') !== 'true');
-  const [loading, setLoading] = useState(false);
   const router = useRouter();
   const setAuth = useAuthStore(s => s.setAuth);
+  const [loading, setLoading] = useState(false);
 
-  const [formData, setFormData] = useState({
-    email: '', password: '', first_name: '', last_name: ''
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGoogleSuccess = async (credentialResponse: any) => {
     setLoading(true);
     try {
-      if (isLogin) {
-        const res = await authApi.login({ email: formData.email, password: formData.password });
-        setAuth(res.data.user, res.data.access, res.data.refresh);
-        toast.success('Logged in successfully');
-        // Honour redirect param (e.g. coming from /checkout)
-        if (redirect) {
-          router.push(redirect);
-        } else if (res.data.user.is_staff) {
-          router.push('/admin');
-        } else {
-          router.push('/account');
-        }
+      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/google/`, {
+        credential: credentialResponse.credential
+      });
+      
+      setAuth(res.data.user, res.data.access, res.data.refresh);
+      toast.success('Successfully logged in with Google');
+      
+      if (redirect) {
+        router.push(redirect);
+      } else if (res.data.user.is_staff) {
+        router.push('/admin');
       } else {
-        const res = await authApi.register(formData);
-        setAuth(res.data.user, res.data.access, res.data.refresh);
-        toast.success('Account created successfully');
-        router.push(redirect || '/account');
+        router.push('/account');
       }
     } catch (err: any) {
-      // Backend returns { error: '...' } not { detail: '...' }
-      const msg =
-        err.response?.data?.error ||
-        err.response?.data?.detail ||
-        'Authentication failed. Please check your credentials.';
-      toast.error(msg);
+      toast.error(err.response?.data?.error || 'Google authentication failed');
     } finally {
       setLoading(false);
     }
@@ -54,63 +40,43 @@ function LoginContent() {
 
   return (
     <div className="pt-[80px] bg-gray-50 min-h-screen flex items-center justify-center py-12 px-4">
-      <div className="bg-white max-w-md w-full p-8 rounded-[2rem] shadow-xl border border-gray-100">
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-block mb-6">
-            <img src="/logo.webp" alt="Hara Ceylon" className="h-12 w-auto mx-auto" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-          </Link>
-          <h1 className="text-2xl font-serif font-bold text-gray-900">
-            {isLogin ? 'Welcome Back' : 'Create Account'}
-          </h1>
-          <p className="text-sm text-gray-500 mt-2">
-            {isLogin ? 'Sign in to access your account' : 'Join Hara Ceylon today'}
-          </p>
+      <div className="bg-white max-w-md w-full p-10 rounded-[2.5rem] shadow-xl border border-gray-100 text-center relative overflow-hidden">
+        
+        {/* Loading Overlay */}
+        {loading && (
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center">
+            <div className="w-10 h-10 border-4 border-brand-gold border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+
+        <Link href="/" className="inline-block mb-8">
+          <img src="/logo.webp" alt="Hara Ceylon" className="h-14 w-auto mx-auto" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+        </Link>
+        
+        <h1 className="text-2xl font-serif font-black text-brand-dark mb-2">
+          Welcome to Hara
+        </h1>
+        <p className="text-sm text-gray-500 mb-10 font-medium">
+          Securely sign in or create an account using your Google Profile.
+        </p>
+
+        <div className="flex justify-center w-full mb-8">
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={() => {
+              toast.error('Google Sign-In failed or was cancelled');
+            }}
+            useOneTap
+            shape="pill"
+            theme="outline"
+            size="large"
+            text="continue_with"
+            width="300px"
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {!isLogin && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="form-group">
-                <label className="form-label">First Name</label>
-                <input required type="text" className="form-control" value={formData.first_name}
-                  onChange={e => setFormData({ ...formData, first_name: e.target.value })} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Last Name</label>
-                <input required type="text" className="form-control" value={formData.last_name}
-                  onChange={e => setFormData({ ...formData, last_name: e.target.value })} />
-              </div>
-            </div>
-          )}
-          <div className="form-group">
-            <label className="form-label">Email Address</label>
-            <input required type="email" className="form-control" value={formData.email}
-              onChange={e => setFormData({ ...formData, email: e.target.value })} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Password</label>
-            <input required type="password" className="form-control" value={formData.password}
-              onChange={e => setFormData({ ...formData, password: e.target.value })} />
-          </div>
-
-          <button
-            disabled={loading}
-            type="submit"
-            className="w-full bg-brand-dark text-white py-4 rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-brand-gold transition-all shadow-lg disabled:opacity-50 mt-6"
-          >
-            {loading ? 'Processing...' : isLogin ? 'Sign In' : 'Create Account'}
-          </button>
-        </form>
-
-        <div className="mt-8 text-center text-sm text-gray-500">
-          {isLogin ? "Don't have an account? " : 'Already have an account? '}
-          <button onClick={() => setIsLogin(!isLogin)} className="font-bold text-brand-gold hover:underline">
-            {isLogin ? 'Sign Up' : 'Sign In'}
-          </button>
-        </div>
-
-        <div className="mt-4 text-center">
-          <Link href="/" className="text-xs text-gray-400 hover:text-brand-gold transition-colors">
+        <div className="mt-8 text-center border-t border-gray-100 pt-6">
+          <Link href="/" className="text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-brand-gold transition-colors">
             ← Back to store
           </Link>
         </div>

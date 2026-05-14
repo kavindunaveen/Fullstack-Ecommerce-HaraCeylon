@@ -208,8 +208,9 @@ router.get('/orders/:orderNumber/', auth_1.authenticate, async (req, res) => {
             shipping_total: order.totalAmount - subtotal,
             shipping_method_name: 'Standard Delivery',
             currency: order.currency,
-            payment_method: 'cod',
-            payment_status: 'pending',
+            payment_method: order.paymentMethod,
+            payment_status: order.paymentStatus,
+            customer_note: order.customerNote,
             items: order.items.map((item) => ({
                 id: item.id,
                 product_name_snapshot: item.product.name,

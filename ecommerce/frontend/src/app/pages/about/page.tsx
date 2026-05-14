@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 export default function AboutPage() {
   const [activeTab, setActiveTab] = useState('vision');
 
-  const containerVariants = {
+  const containerVariants: any = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
@@ -14,7 +14,7 @@ export default function AboutPage() {
     }
   };
 
-  const itemVariants = {
+  const itemVariants: any = {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0, transition: { type: 'spring', damping: 25, stiffness: 200 } }
   };

@@ -49,7 +49,7 @@ function SuccessContent() {
           </div>
           <h1 className="text-5xl font-serif font-bold text-brand-dark mb-4 tracking-tight">Order <span className="text-brand-gold">Confirmed!</span></h1>
           <p className="text-gray-500 text-lg max-w-lg mx-auto leading-relaxed">
-            Thank you for choosing <span className="font-bold text-brand-dark">HARA</span>. Your order is being prepared with care and will be on its way soon.
+            Thank you for choosing <span className="font-bold text-brand-dark">Hara Ceylon</span>. Your order is being prepared with care and will be on its way soon.
           </p>
           
           {/* Decorative elements */}
@@ -158,11 +158,11 @@ function SuccessContent() {
                 </div>
                 <div className="flex gap-4">
                   <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center shrink-0 border border-blue-100">
-                    <Mail size={16} />
+                    <CheckCircle2 size={16} />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-brand-dark">Confirmation Email</p>
-                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">A detailed receipt has been sent to your email address.</p>
+                    <p className="text-sm font-bold text-brand-dark">Order Recorded</p>
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">Your order details have been securely saved and can be viewed in your account dashboard.</p>
                   </div>
                 </div>
                 <div className="flex gap-4">

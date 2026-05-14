@@ -56,6 +56,7 @@ export default function ProductDetailPage() {
   }, [slug]);
 
   const handleAddToCart = async () => {
+    if (!product) return;
     try {
       const res = await cartApi.add({ product_id: product.id, quantity });
       setCart(res.data);
@@ -67,6 +68,7 @@ export default function ProductDetailPage() {
   };
 
   const toggleWishlist = () => {
+    if (!product) return;
     if (isWishlisted) {
       removeWishlist(product.id);
       toast.success('Removed from wishlist');
@@ -233,10 +235,6 @@ export default function ProductDetailPage() {
                   <div className="flex items-center gap-3 text-sm text-gray-600">
                     <div className="w-8 h-8 rounded-full bg-brand-gold/10 text-brand-gold flex items-center justify-center"><ShieldCheck size={16} /></div>
                     <span className="font-medium">100% Authentic</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-sm text-gray-600">
-                    <div className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center hover:bg-gray-200 cursor-pointer transition-colors"><Share2 size={16} /></div>
-                    <span className="font-medium">Share Product</span>
                   </div>
                 </div>
 

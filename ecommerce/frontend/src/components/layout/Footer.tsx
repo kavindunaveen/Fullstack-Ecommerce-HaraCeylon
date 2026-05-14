@@ -17,14 +17,6 @@ export default function Footer() {
             <p className="text-gray-400 font-light leading-relaxed max-w-md mb-8">
               Cultivating wellness and tradition, from the misty hills of Sri Lanka straight to your cherished daily ritual.
             </p>
-            <div className="flex gap-4">
-              <a href="#" className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:border-brand-gold hover:bg-brand-gold/10 transition-all duration-300">
-                <Globe size={18} strokeWidth={1.5} />
-              </a>
-              <a href="#" className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:border-brand-gold hover:bg-brand-gold/10 transition-all duration-300">
-                <Mail size={18} strokeWidth={1.5} />
-              </a>
-            </div>
           </div>
 
           <div className="lg:col-span-2">

@@ -5,19 +5,9 @@ import { accountApi } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { MapPin, Loader2, Plus, Trash2, X, Home, Briefcase, Globe } from 'lucide-react';
 import Link from 'next/link';
+import AddressFields from '@/components/checkout/AddressFields';
 
-const COUNTRIES = [
-  { code: 'GB', name: 'United Kingdom' },
-  { code: 'US', name: 'United States' },
-  { code: 'LK', name: 'Sri Lanka' },
-  { code: 'AE', name: 'United Arab Emirates' },
-  { code: 'AU', name: 'Australia' },
-  { code: 'CA', name: 'Canada' },
-  { code: 'DE', name: 'Germany' },
-  { code: 'FR', name: 'France' },
-  { code: 'IN', name: 'India' },
-  { code: 'SG', name: 'Singapore' },
-];
+
 
 const INITIAL_FORM = {
   full_name: '',
@@ -38,6 +28,9 @@ export default function AddressesPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(INITIAL_FORM);
+  const handleSelectChange = (name: string, value: string) => {
+    setForm(f => ({ ...f, [name]: value }));
+  };
   const [saving, setSaving] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -174,16 +167,10 @@ export default function AddressesPage() {
                     placeholder="+44 ..."
                   />
                 </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] uppercase font-black text-gray-400 tracking-[0.2em] ml-1">Country *</label>
-                  <select
-                    value={form.country}
-                    onChange={(e) => setForm({ ...form, country: e.target.value })}
-                    className="w-full px-6 py-4 rounded-2xl border border-gray-100 focus:border-brand-gold outline-none bg-white font-medium cursor-pointer"
-                  >
-                    {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
-                  </select>
-                </div>
+                <AddressFields 
+                  formData={form} 
+                  onChange={handleSelectChange} 
+                />
                 <div className="md:col-span-2 space-y-3">
                   <label className="text-[10px] uppercase font-black text-gray-400 tracking-[0.2em] ml-1">Street Address *</label>
                   <input
@@ -204,16 +191,7 @@ export default function AddressesPage() {
                     className="w-full px-6 py-4 rounded-2xl border border-gray-100 focus:border-brand-gold outline-none bg-white font-medium"
                   />
                 </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] uppercase font-black text-gray-400 tracking-[0.2em] ml-1">City / Town *</label>
-                  <input
-                    required
-                    type="text"
-                    value={form.city}
-                    onChange={(e) => setForm({ ...form, city: e.target.value })}
-                    className="w-full px-6 py-4 rounded-2xl border border-gray-100 focus:border-brand-gold outline-none bg-white font-medium"
-                  />
-                </div>
+
                 <div className="space-y-3">
                   <label className="text-[10px] uppercase font-black text-gray-400 tracking-[0.2em] ml-1">Postcode / ZIP *</label>
                   <input

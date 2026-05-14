@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import prisma from '../prisma';
 import { authenticate, optionalAuthenticate, AuthRequest } from '../middleware/auth';
+import { DEFAULT_RATES, DOMESTIC_RATES } from './shipping';
 
 const router = Router();
 
@@ -24,11 +25,16 @@ router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): P
       shipping_postal_code,
       ship_to_different_address,
       currency = 'GBP',
-      shipping_rate_id
+      shipping_rate_id,
+      customer_note,
+      payment_method,
+      save_address
     } = req.body;
 
     const sessionId = req.headers['x-session-id'] as string;
     let cart;
+
+    let checkoutUserId = req.user?.id || null;
 
     // Try finding by userId first if authenticated
     if (req.user) {
@@ -62,6 +68,15 @@ router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): P
       return res.status(400).json({ error: 'Cart is empty' });
     }
 
+    // Validate stock before proceeding
+    for (const item of cart.items) {
+      if (item.product.stock < item.quantity) {
+        return res.status(400).json({ 
+          error: `Insufficient stock for ${item.product.name}. Only ${item.product.stock} available.` 
+        });
+      }
+    }
+
     const sName = ship_to_different_address ? shipping_full_name : billing_full_name;
     const sAddr = ship_to_different_address 
       ? `${shipping_address_line_1}${shipping_address_line_2 ? ', ' + shipping_address_line_2 : ''}`
@@ -78,10 +93,11 @@ router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): P
     let shippingPrice = 0;
     if (shipping_rate_id) {
       const rateId = parseInt(shipping_rate_id, 10);
-      if (rateId === 1) shippingPrice = 10; // Standard International
-      else if (rateId === 2) shippingPrice = 25; // Express International
-      else if (rateId === 3) shippingPrice = 2;  // Standard Local
-      else if (rateId === 4) shippingPrice = 5;  // Next Day
+      const allRates = [...DEFAULT_RATES, ...DOMESTIC_RATES];
+      const selectedRate = allRates.find(r => r.id === rateId);
+      if (selectedRate) {
+        shippingPrice = parseFloat(selectedRate.price);
+      }
     }
 
     const subtotal = cart.items.reduce((acc, item) => acc + (item.product.effectivePrice * item.quantity), 0);
@@ -91,7 +107,7 @@ router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): P
     const order = await prisma.order.create({
       data: {
         orderNumber,
-        userId: req.user?.id || null,
+        userId: checkoutUserId,
         totalAmount,
         currency,
         shippingName: sName,
@@ -99,6 +115,9 @@ router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): P
         shippingCity: sCity,
         shippingCountry: sCountry,
         shippingZip: sZip,
+        paymentMethod: payment_method || 'cod',
+        paymentStatus: 'pending',
+        customerNote: customer_note || null,
         items: {
           create: cart.items.map(item => ({
             productId: item.productId,
@@ -108,6 +127,53 @@ router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): P
         }
       }
     });
+
+    // Save address to user profile if requested
+    if (checkoutUserId && save_address) {
+      const [firstName, ...lastNameParts] = (billing_full_name || '').split(' ');
+      const lastName = lastNameParts.join(' ');
+
+      const addressData = {
+        userId: checkoutUserId,
+        firstName: firstName || 'Customer',
+        lastName: lastName || '',
+        street: billing_address_line_1,
+        city: billing_city,
+        state: billing_state || null,
+        zipCode: billing_postal_code,
+        country: billing_country,
+        phone: billing_phone,
+      };
+
+      // Check if user already has this address
+      const existingAddress = await prisma.address.findFirst({
+        where: {
+          userId: checkoutUserId,
+          street: billing_address_line_1,
+          zipCode: billing_postal_code,
+          city: billing_city
+        }
+      });
+
+      if (!existingAddress) {
+        // If it's their first address, make it default
+        const addressCount = await prisma.address.count({ where: { userId: checkoutUserId } });
+        await prisma.address.create({
+          data: {
+            ...addressData,
+            isDefault: addressCount === 0
+          }
+        });
+      }
+    }
+
+    // Decrement stock for each item
+    for (const item of cart.items) {
+      await prisma.product.update({
+        where: { id: item.productId },
+        data: { stock: { decrement: item.quantity } }
+      });
+    }
 
     // Clear cart
     await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });

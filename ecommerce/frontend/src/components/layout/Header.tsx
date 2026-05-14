@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { Search, ShoppingBag, User, Menu, X, LogOut, Package, Settings, ChevronDown, Loader2 } from 'lucide-react';
+import { Search, ShoppingBag, User, Menu, X, LogOut, Package, Settings, ChevronDown, Loader2, Heart } from 'lucide-react';
 import { useCartStore, useAuthStore, useCurrencyStore } from '@/lib/store';
 import { usePathname, useRouter } from 'next/navigation';
 import { productsApi } from '@/lib/api';
@@ -190,6 +190,11 @@ export default function Header() {
                         <Link href="/account" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 text-gray-700 transition-colors group">
                           <Package size={18} className="text-gray-400 group-hover:text-brand-gold" />
                           <span className="text-sm font-medium">My Orders</span>
+                        </Link>
+                        
+                        <Link href="/account/wishlist" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 text-gray-700 transition-colors group">
+                          <Heart size={18} className="text-gray-400 group-hover:text-brand-gold" />
+                          <span className="text-sm font-medium">My Wishlist</span>
                         </Link>
                         
                         <Link href="/account/profile" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 text-gray-700 transition-colors group">

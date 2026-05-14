@@ -6,13 +6,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const prisma_1 = __importDefault(require("../prisma"));
 const auth_1 = require("../middleware/auth");
+const shipping_1 = require("./shipping");
 const router = (0, express_1.Router)();
 // Checkout
 router.post('/checkout/', auth_1.optionalAuthenticate, async (req, res) => {
     try {
-        const { billing_full_name, billing_email, billing_phone, billing_address_line_1, billing_address_line_2, billing_city, billing_country, billing_postal_code, shipping_full_name, shipping_address_line_1, shipping_address_line_2, shipping_city, shipping_country, shipping_postal_code, ship_to_different_address, currency = 'GBP', shipping_rate_id } = req.body;
+        const { billing_full_name, billing_email, billing_phone, billing_address_line_1, billing_address_line_2, billing_city, billing_country, billing_postal_code, shipping_full_name, shipping_address_line_1, shipping_address_line_2, shipping_city, shipping_country, shipping_postal_code, ship_to_different_address, currency = 'GBP', shipping_rate_id, customer_note, payment_method } = req.body;
         const sessionId = req.headers['x-session-id'];
         let cart;
+        let checkoutUserId = req.user?.id || null;
         // Try finding by userId first if authenticated
         if (req.user) {
             cart = await prisma_1.default.cart.findUnique({
@@ -41,6 +43,14 @@ router.post('/checkout/', auth_1.optionalAuthenticate, async (req, res) => {
         if (!cart || cart.items.length === 0) {
             return res.status(400).json({ error: 'Cart is empty' });
         }
+        // Validate stock before proceeding
+        for (const item of cart.items) {
+            if (item.product.stock < item.quantity) {
+                return res.status(400).json({
+                    error: `Insufficient stock for ${item.product.name}. Only ${item.product.stock} available.`
+                });
+            }
+        }
         const sName = ship_to_different_address ? shipping_full_name : billing_full_name;
         const sAddr = ship_to_different_address
             ? `${shipping_address_line_1}${shipping_address_line_2 ? ', ' + shipping_address_line_2 : ''}`
@@ -55,14 +65,11 @@ router.post('/checkout/', auth_1.optionalAuthenticate, async (req, res) => {
         let shippingPrice = 0;
         if (shipping_rate_id) {
             const rateId = parseInt(shipping_rate_id, 10);
-            if (rateId === 1)
-                shippingPrice = 10; // Standard International
-            else if (rateId === 2)
-                shippingPrice = 25; // Express International
-            else if (rateId === 3)
-                shippingPrice = 2; // Standard Local
-            else if (rateId === 4)
-                shippingPrice = 5; // Next Day
+            const allRates = [...shipping_1.DEFAULT_RATES, ...shipping_1.DOMESTIC_RATES];
+            const selectedRate = allRates.find(r => r.id === rateId);
+            if (selectedRate) {
+                shippingPrice = parseFloat(selectedRate.price);
+            }
         }
         const subtotal = cart.items.reduce((acc, item) => acc + (item.product.effectivePrice * item.quantity), 0);
         const totalAmount = subtotal + shippingPrice;
@@ -70,7 +77,7 @@ router.post('/checkout/', auth_1.optionalAuthenticate, async (req, res) => {
         const order = await prisma_1.default.order.create({
             data: {
                 orderNumber,
-                userId: req.user?.id || null,
+                userId: checkoutUserId,
                 totalAmount,
                 currency,
                 shippingName: sName,
@@ -78,6 +85,9 @@ router.post('/checkout/', auth_1.optionalAuthenticate, async (req, res) => {
                 shippingCity: sCity,
                 shippingCountry: sCountry,
                 shippingZip: sZip,
+                paymentMethod: payment_method || 'cod',
+                paymentStatus: 'pending',
+                customerNote: customer_note || null,
                 items: {
                     create: cart.items.map(item => ({
                         productId: item.productId,
@@ -87,6 +97,13 @@ router.post('/checkout/', auth_1.optionalAuthenticate, async (req, res) => {
                 }
             }
         });
+        // Decrement stock for each item
+        for (const item of cart.items) {
+            await prisma_1.default.product.update({
+                where: { id: item.productId },
+                data: { stock: { decrement: item.quantity } }
+            });
+        }
         // Clear cart
         await prisma_1.default.cartItem.deleteMany({ where: { cartId: cart.id } });
         res.status(201).json({

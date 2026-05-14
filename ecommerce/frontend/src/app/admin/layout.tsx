@@ -12,14 +12,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
 
   useEffect(() => {
+    if (pathname === '/admin/login') return;
+    
     if (!isAuthenticated) {
-      router.push('/account/login');
+      router.push(`/admin/login?redirect=${encodeURIComponent(pathname)}`);
     } else if (user && !user.is_staff) {
       router.push('/account');
     }
-  }, [isAuthenticated, user, router]);
+  }, [isAuthenticated, user, router, pathname]);
 
-  if (!isAuthenticated || !user || !user.is_staff) return null;
+  if (pathname !== '/admin/login' && (!isAuthenticated || !user || !user.is_staff)) return null;
 
   const navItems = [
     { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
@@ -28,6 +30,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { label: 'Customers', href: '/admin/customers', icon: Users },
     { label: 'Settings', href: '/admin/settings', icon: Settings },
   ];
+
+  if (pathname === '/admin/login') return <>{children}</>;
 
   return (
     <div className="admin-layout" style={{ zIndex: 1000, position: 'relative' }}>
@@ -52,9 +56,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <header className="admin-topbar shadow-sm">
           <div className="admin-topbar__title text-brand-dark font-serif">Management Portal</div>
           <div className="flex items-center gap-4">
-            <span className="text-sm font-bold text-gray-600">{user.email}</span>
+            <span className="text-sm font-bold text-gray-600">{user?.email}</span>
             <div className="w-8 h-8 rounded-full bg-brand-gold text-white flex items-center justify-center font-bold text-sm">
-              {user.first_name?.[0]}{user.last_name?.[0]}
+              {user?.first_name?.[0]}{user?.last_name?.[0]}
             </div>
           </div>
         </header>

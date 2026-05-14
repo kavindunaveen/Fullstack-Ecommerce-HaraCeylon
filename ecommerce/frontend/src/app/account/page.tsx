@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   Package, MapPin, User as UserIcon, LogOut,
   ChevronRight, ShoppingBag, Clock, CheckCircle2,
-  XCircle, Truck, ExternalLink
+  XCircle, Truck, ExternalLink, Heart
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -127,6 +127,14 @@ export default function AccountPage() {
                 <div className="flex items-center gap-3 text-gray-400 group-hover:text-brand-gold">
                   <MapPin size={20} />
                   <span className="text-gray-600">Addresses</span>
+                </div>
+                <ChevronRight size={16} className="opacity-0 group-hover:opacity-100 transition-all" />
+              </Link>
+
+              <Link href="/account/wishlist" className="flex items-center justify-between group p-3.5 rounded-2xl hover:bg-gray-50 text-gray-500 hover:text-brand-dark transition-all font-medium">
+                <div className="flex items-center gap-3 text-gray-400 group-hover:text-brand-gold">
+                  <Heart size={20} />
+                  <span className="text-gray-600">Wishlist</span>
                 </div>
                 <ChevronRight size={16} className="opacity-0 group-hover:opacity-100 transition-all" />
               </Link>

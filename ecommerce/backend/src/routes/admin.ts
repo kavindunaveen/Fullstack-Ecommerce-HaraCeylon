@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import * as bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import prisma from '../prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
 
@@ -11,6 +13,61 @@ const requireAdmin = (req: AuthRequest, res: any, next: any) => {
   }
   next();
 };
+
+// Admin Login (Email/Password)
+router.post('/login', async (req, res): Promise<any> => {
+  try {
+    const { email, password } = req.body;
+    console.log('Admin login attempt for:', email);
+    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      console.log('User not found:', email);
+      return res.status(401).json({ error: 'Invalid admin credentials' });
+    }
+    
+    console.log('User found:', user.email, 'Role:', user.role);
+
+    if (user.role !== 'ADMIN' || !user.passwordHash) {
+      console.log('User is not admin or has no password hash');
+      return res.status(401).json({ error: 'Invalid admin credentials' });
+    }
+
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    console.log('Password valid:', valid);
+    
+    if (!valid) return res.status(401).json({ error: 'Invalid admin credentials' });
+
+    const accessToken = jwt.sign({ userId: user.id }, process.env.JWT_ACCESS_SECRET as string, { expiresIn: '1d' });
+    const refreshToken = jwt.sign({ userId: user.id }, process.env.JWT_REFRESH_SECRET as string, { expiresIn: '7d' });
+
+    // Store refresh token
+    await prisma.refreshToken.create({
+      data: {
+        token: refreshToken,
+        userId: user.id,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      }
+    });
+
+    res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        first_name: user.firstName,
+        last_name: user.lastName,
+        role: user.role,
+        is_staff: true
+      },
+      access: accessToken,
+      refresh: refreshToken
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
 
 // Admin Dashboard Stats
 router.get('/stats', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
@@ -65,6 +122,21 @@ router.get('/products', authenticate, requireAdmin, async (req: AuthRequest, res
     res.json({ products });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch products' });
+  }
+});
+
+// Admin Product Detail (by ID)
+router.get('/products/:id', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const id = req.params.id as string;
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: { category: true, images: true }
+    });
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+    res.json(product);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch product' });
   }
 });
 
@@ -284,6 +356,33 @@ router.post('/seed', authenticate, requireAdmin, async (req: AuthRequest, res): 
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Seed failed' });
+  }
+});
+
+// Admin Account Setup (Sets or updates admin password)
+router.post('/setup-account', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    
+    const user = await prisma.user.upsert({
+      where: { email },
+      update: { passwordHash, role: 'ADMIN' },
+      create: { 
+        email, 
+        passwordHash, 
+        role: 'ADMIN',
+        firstName: 'Store',
+        lastName: 'Admin'
+      }
+    });
+
+    res.json({ message: 'Admin account secured with password', email: user.email });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Setup failed' });
   }
 });
 

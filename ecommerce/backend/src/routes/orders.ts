@@ -17,6 +17,7 @@ router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): P
       billing_city,
       billing_country,
       billing_postal_code,
+      billing_state,
       shipping_full_name,
       shipping_address_line_1,
       shipping_address_line_2,

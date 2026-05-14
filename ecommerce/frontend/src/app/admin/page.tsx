@@ -34,8 +34,29 @@ export default function AdminDashboard() {
   const { formatPrice } = useCurrencyStore();
 
   useEffect(() => {
-    api.get('/admin-api/dashboard/')
-      .then(res => setStats(res.data))
+    api.get('/admin/stats')
+      .then(res => {
+        const { stats: s, recentOrders } = res.data;
+        setStats({
+          total_revenue: s.totalRevenue,
+          today_revenue: 0, // Mocked for now, backend could provide
+          active_orders: s.totalOrders,
+          total_customers: s.totalCustomers,
+          low_stock_items: 0,
+          total_orders: s.totalOrders,
+          today_orders: 0,
+          new_customers_today: 0,
+          pending_orders: recentOrders.filter((o: any) => o.status === 'pending').length,
+          recent_orders: recentOrders.map((o: any) => ({
+            order_number: o.id,
+            customer_name: o.customer,
+            order_status: o.status,
+            grand_total: o.total,
+            created_at: o.date,
+            customer_email: o.customer // Fallback
+          }))
+        } as DashboardStats);
+      })
       .catch(() => toast.error('Failed to load dashboard stats'))
       .finally(() => setLoading(false));
   }, []);

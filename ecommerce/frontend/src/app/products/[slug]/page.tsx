@@ -35,10 +35,10 @@ export default function ProductDetailPage() {
   const router = useRouter();
 
   const { setCart, openCart } = useCartStore();
-  const { items: wishlistItems, addItem: addWishlist, removeItem: removeWishlist } = useWishlistStore();
+  const { items: wishlistItems, addItem: addWishlist, removeItem: removeWishlist, hasItem } = useWishlistStore();
   const { formatPrice } = useCurrencyStore();
 
-  const isWishlisted = wishlistItems.some((item: any) => (item.product_id || item) === product?.id);
+  const isWishlisted = product ? hasItem(product.id) : false;
 
   useEffect(() => {
     productsApi.detail(slug as string).then((res) => {

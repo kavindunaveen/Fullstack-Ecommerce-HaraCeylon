@@ -126,9 +126,17 @@ export const useWishlistStore = create<WishlistState>()(
   persist(
     (set, get) => ({
       items: [],
-      addItem: (id) => set((s) => ({ items: [...new Set([...s.items, id])] })),
-      removeItem: (id) => set((s) => ({ items: s.items.filter((i) => i !== id) })),
-      hasItem: (id) => get().items.includes(id),
+      addItem: (id) => set((s) => ({ items: [...new Set([...s.items, String(id).trim().toLowerCase()])] })),
+      removeItem: (id) => set((s) => ({ 
+        items: s.items.filter((i: any) => {
+          const itemId = String(typeof i === 'string' ? i : (i.product_id || i.id)).trim().toLowerCase();
+          return itemId !== String(id).trim().toLowerCase();
+        })
+      })),
+      hasItem: (id) => get().items.some((i: any) => {
+        const itemId = String(typeof i === 'string' ? i : (i.product_id || i.id)).trim().toLowerCase();
+        return itemId === String(id).trim().toLowerCase();
+      }),
     }),
     { name: 'hara-wishlist' }
   )

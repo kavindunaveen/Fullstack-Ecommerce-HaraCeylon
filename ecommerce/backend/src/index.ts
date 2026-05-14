@@ -68,13 +68,16 @@ const formatProduct = (p: any, detail = false) => {
 
 app.get('/api/products', async (req, res) => {
   try {
-    const { search, category } = req.query;
+    const { search, category, ids } = req.query;
     const whereClause: any = {};
     if (search && typeof search === 'string') {
       whereClause.name = { contains: search };
     }
     if (category && typeof category === 'string') {
       whereClause.category = { slug: category };
+    }
+    if (ids && typeof ids === 'string') {
+      whereClause.id = { in: ids.split(',') };
     }
     const products = await prisma.product.findMany({
       where: whereClause,

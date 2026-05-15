@@ -25,7 +25,8 @@ app.use(cors({
       callback(new Error('Not allowed by CORS'));
     }
   }, 
-  credentials: true 
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-ID', 'X-Currency', 'Accept-Language']
 }));
 
 app.use(express.json());

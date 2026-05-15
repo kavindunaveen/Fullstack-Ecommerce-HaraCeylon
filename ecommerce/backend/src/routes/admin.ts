@@ -8,10 +8,19 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
+// Converts stored relative image path to absolute URL
+const toAbsoluteUrl = (url: string | undefined | null): string | null => {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  const base = process.env.BACKEND_URL || 'http://localhost:8001';
+  return `${base}${url}`;
+};
+
 // Configure Multer for local storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+    const uploadPath = path.join(__dirname, '../../uploads');
+    cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
@@ -144,7 +153,17 @@ router.get('/products', authenticate, requireAdmin, async (req: AuthRequest, res
       include: { category: true, images: true },
       orderBy: { createdAt: 'desc' }
     });
-    res.json({ products });
+    
+    // Format to include absolute image URLs
+    const formattedProducts = products.map(p => {
+      const mainImg = p.images.find(img => img.isMain) || p.images[0];
+      return {
+        ...p,
+        imageUrl: mainImg ? toAbsoluteUrl(mainImg.imageUrl) : null
+      };
+    });
+    
+    res.json({ products: formattedProducts });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch products' });
   }
@@ -159,7 +178,12 @@ router.get('/products/:id', authenticate, requireAdmin, async (req: AuthRequest,
       include: { category: true, images: true }
     });
     if (!product) return res.status(404).json({ error: 'Product not found' });
-    res.json(product);
+    
+    const mainImg = product.images.find(img => img.isMain) || product.images[0];
+    res.json({
+      ...product,
+      imageUrl: mainImg ? toAbsoluteUrl(mainImg.imageUrl) : null
+    });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch product' });
   }

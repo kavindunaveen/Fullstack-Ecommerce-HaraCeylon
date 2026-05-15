@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useAuthStore, useCurrencyStore } from '@/lib/store';
-import { accountApi } from '@/lib/api';
+import { accountApi, authApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import {
   Package, MapPin, User as UserIcon, LogOut,
@@ -67,9 +67,16 @@ export default function AccountPage() {
       .finally(() => setLoading(false));
   }, [mounted, isAuthenticated, router]);
 
-  const handleLogout = () => {
-    clearAuth();
-    router.push('/');
+  const handleLogout = async () => {
+    try {
+      const refresh = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
+      if (refresh) await authApi.logout();
+    } catch {
+      // Still clear local state even if API fails
+    } finally {
+      clearAuth();
+      router.push('/');
+    }
   };
 
   // Show spinner while hydrating or while loading orders

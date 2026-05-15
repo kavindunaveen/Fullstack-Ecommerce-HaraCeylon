@@ -49,33 +49,44 @@ const resolveCart = async (req: AuthRequest, res: any, next: any) => {
   }
 };
 
+// Converts a stored image path (e.g. /uploads/img.jpg) into a full URL
+const toAbsoluteUrl = (url: string | undefined | null): string | null => {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  const base = process.env.BACKEND_URL || 'http://localhost:8001';
+  return `${base}${url}`;
+};
+
 const formatCart = async (cartId: string) => {
   const items = await prisma.cartItem.findMany({
     where: { cartId: cartId },
     include: { product: { include: { images: true } } }
   });
 
-  const formattedItems = items.map(item => ({
-    id: item.id,
-    product: {
-      id: item.product.id,
-      name: item.product.name,
-      slug: item.product.slug,
-      sku: item.product.id.slice(0, 8),
-      price: item.product.basePrice,
-      sale_price: item.product.basePrice !== item.product.effectivePrice ? item.product.effectivePrice : null,
-      effective_price: item.product.effectivePrice,
-      stock_status: item.product.stock > 0 ? 'in_stock' : 'out_of_stock',
-      main_image: (item.product.images.find(i => i.isMain) || item.product.images[0]) ? {
-        image_url: (item.product.images.find(i => i.isMain) || item.product.images[0]).imageUrl,
-        is_main: (item.product.images.find(i => i.isMain) || item.product.images[0]).isMain,
-        alt_text: item.product.name
-      } : null
-    },
-    quantity: item.quantity,
-    unit_price: item.product.effectivePrice,
-    line_total: item.product.effectivePrice * item.quantity
-  }));
+  const formattedItems = items.map(item => {
+    const mainImg = item.product.images.find(i => i.isMain) || item.product.images[0] || null;
+    return {
+      id: item.id,
+      product: {
+        id: item.product.id,
+        name: item.product.name,
+        slug: item.product.slug,
+        sku: item.product.id.slice(0, 8),
+        price: item.product.basePrice,
+        sale_price: item.product.basePrice !== item.product.effectivePrice ? item.product.effectivePrice : null,
+        effective_price: item.product.effectivePrice,
+        stock_status: item.product.stock > 0 ? 'in_stock' : 'out_of_stock',
+        main_image: mainImg ? {
+          image_url: toAbsoluteUrl(mainImg.imageUrl),
+          is_main: mainImg.isMain,
+          alt_text: item.product.name
+        } : null
+      },
+      quantity: item.quantity,
+      unit_price: item.product.effectivePrice,
+      line_total: item.product.effectivePrice * item.quantity
+    };
+  });
 
   const subtotal = formattedItems.reduce((acc, item) => acc + item.line_total, 0);
   const itemCount = formattedItems.reduce((acc, item) => acc + item.quantity, 0);

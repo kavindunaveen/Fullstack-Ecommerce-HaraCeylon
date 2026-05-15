@@ -49,11 +49,12 @@ export default function Home() {
   const addToCart = async (e: React.MouseEvent, product: Product) => {
     e.preventDefault();
     e.stopPropagation();
+    // Open cart and toast immediately — don't wait for API
+    openCart();
+    toast.success('Added to bag');
     try {
       const res = await cartApi.add({ product_id: product.id, quantity: 1 });
       setCart(res.data);
-      toast.success('Added to bag');
-      openCart();
     } catch {
       toast.error('Could not add to bag');
     }

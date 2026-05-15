@@ -57,11 +57,12 @@ export default function ProductDetailPage() {
 
   const handleAddToCart = async () => {
     if (!product) return;
+    // Open cart and toast immediately — don't wait for API
+    openCart();
+    toast.success('Added to bag');
     try {
       const res = await cartApi.add({ product_id: product.id, quantity });
       setCart(res.data);
-      toast.success('Added to bag');
-      openCart();
     } catch {
       toast.error('Could not add to bag');
     }

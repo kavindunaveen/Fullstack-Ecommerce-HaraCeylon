@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import prisma from '../prisma';
 import rateLimit from 'express-rate-limit';
 
@@ -123,6 +124,90 @@ router.post('/logout/', async (req, res): Promise<any> => {
   } catch (error) {
     console.error('Logout error:', error);
     res.status(500).json({ error: 'Logout failed' });
+  }
+});
+
+// ── Email / Password Registration ────────────────────────────
+router.post('/registration/', authLimiter, async (req, res): Promise<any> => {
+  try {
+    const { email, password, first_name = '', last_name = '' } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return res.status(400).json({ error: 'An account with this email already exists' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const user = await prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        firstName: first_name,
+        lastName: last_name,
+        role: 'CUSTOMER',
+      }
+    });
+
+    const tokens = await generateTokens(user.id);
+    res.status(201).json({
+      user: {
+        id: user.id,
+        email: user.email,
+        first_name: user.firstName,
+        last_name: user.lastName,
+        role: user.role,
+        is_staff: false,
+      },
+      ...tokens
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+// ── Email / Password Login ─────────────────────────────────
+router.post('/login/', authLimiter, async (req, res): Promise<any> => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user || !user.passwordHash) {
+      // Don't reveal whether email exists; generic message
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const tokens = await generateTokens(user.id);
+    res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        first_name: user.firstName,
+        last_name: user.lastName,
+        role: user.role,
+        is_staff: user.role === 'ADMIN',
+      },
+      ...tokens
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Login failed' });
   }
 });
 

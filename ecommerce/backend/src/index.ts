@@ -11,6 +11,10 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 8001;
 
+// Express 5 defaults to strict routing (trailing slash matters).
+// Disable it so /path and /path/ are treated identically.
+app.set('strict routing', false);
+
 // Production CORS configuration
 const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000').split(',');
 app.use(cors({ 
@@ -121,46 +125,53 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
-// Featured Products
-app.get('/api/products/featured', async (req, res) => {
+// Featured Products (accept both /featured and /featured/)
+const featuredHandler = async (req: any, res: any) => {
   try {
     const products = await prisma.product.findMany({
       where: { isFeatured: true },
       include: { category: true, images: true }
     });
-    res.json({ results: products.map(p => formatProduct(p)) });
+    res.json({ results: products.map((p: any) => formatProduct(p)) });
   } catch (error) {
     res.status(500).json({ error: 'Failed' });
   }
-});
+};
+app.get('/api/products/featured', featuredHandler);
+app.get('/api/products/featured/', featuredHandler);
 
-// New Arrivals
-app.get('/api/products/new-arrivals', async (req, res) => {
+// New Arrivals (accept both /new-arrivals and /new-arrivals/)
+const newArrivalsHandler = async (req: any, res: any) => {
   try {
     const products = await prisma.product.findMany({
       where: { isNewArrival: true },
       include: { category: true, images: true }
     });
-    res.json({ results: products.map(p => formatProduct(p)) });
+    res.json({ results: products.map((p: any) => formatProduct(p)) });
   } catch (error) {
     res.status(500).json({ error: 'Failed' });
   }
-});
+};
+app.get('/api/products/new-arrivals', newArrivalsHandler);
+app.get('/api/products/new-arrivals/', newArrivalsHandler);
 
-// Best Sellers
-app.get('/api/products/best-sellers', async (req, res) => {
+// Best Sellers (accept both /best-sellers and /best-sellers/)
+const bestSellersHandler = async (req: any, res: any) => {
   try {
     const products = await prisma.product.findMany({
       where: { isBestSeller: true },
       include: { category: true, images: true }
     });
-    res.json({ results: products.map(p => formatProduct(p)) });
+    res.json({ results: products.map((p: any) => formatProduct(p)) });
   } catch (error) {
     res.status(500).json({ error: 'Failed' });
   }
-});
+};
+app.get('/api/products/best-sellers', bestSellersHandler);
+app.get('/api/products/best-sellers/', bestSellersHandler);
 
-app.get('/api/products/categories', async (req, res) => {
+// Categories (accept both /categories and /categories/)
+const categoriesHandler = async (req: any, res: any) => {
   try {
     const categories = await prisma.category.findMany();
     res.json({ results: categories });
@@ -168,7 +179,9 @@ app.get('/api/products/categories', async (req, res) => {
     console.error(error);
     res.status(500).json({ error: 'Failed to fetch categories' });
   }
-});
+};
+app.get('/api/products/categories', categoriesHandler);
+app.get('/api/products/categories/', categoriesHandler);
 
 // Product Detail
 app.get('/api/products/:slug', async (req, res): Promise<any> => {
@@ -184,6 +197,79 @@ app.get('/api/products/:slug', async (req, res): Promise<any> => {
     console.error(error);
     res.status(500).json({ error: 'Failed' });
   }
+});
+
+// ───────────────────────────────────────────────
+// Stub routes — called by frontend but lightweight
+// ───────────────────────────────────────────────
+
+// Currencies list (used by currency switcher)
+app.get('/api/products/currencies', (req, res) => {
+  res.json([
+    { code: 'GBP', symbol: '£', name: 'British Pound', rate: 1 },
+    { code: 'USD', symbol: '$', name: 'US Dollar', rate: 1.27 },
+    { code: 'EUR', symbol: '€', name: 'Euro', rate: 1.17 },
+    { code: 'LKR', symbol: '₨', name: 'Sri Lankan Rupee', rate: 385 },
+    { code: 'AUD', symbol: 'A$', name: 'Australian Dollar', rate: 1.95 },
+    { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar', rate: 1.72 },
+  ]);
+});
+app.get('/api/products/currencies/', (req, res) => res.redirect(301, '/api/products/currencies'));
+
+// Languages list
+app.get('/api/products/languages', (req, res) => {
+  res.json([{ code: 'en', name: 'English' }]);
+});
+app.get('/api/products/languages/', (req, res) => res.redirect(301, '/api/products/languages'));
+
+// Brands list (not implemented — return empty)
+app.get('/api/products/brands', (req, res) => res.json({ results: [] }));
+app.get('/api/products/brands/', (req, res) => res.redirect(301, '/api/products/brands'));
+
+// Coupons validate (stub — no discount applied)
+app.post('/api/coupons/validate/', (req, res) => {
+  res.status(400).json({ error: 'Coupon codes are not available at this time.' });
+});
+
+// Static pages (About, Terms, Privacy, Contact)
+const PAGES: Record<string, { title: string; content: string }> = {
+  about: {
+    title: 'About HARA Ceylon',
+    content: 'HARA Ceylon is a premium e-commerce platform offering the finest teas and coffees from Sri Lanka.',
+  },
+  terms: {
+    title: 'Terms & Conditions',
+    content: 'By using our website you agree to our terms and conditions. All orders are subject to availability.',
+  },
+  privacy: {
+    title: 'Privacy Policy',
+    content: 'We take your privacy seriously. We do not share your personal information with third parties.',
+  },
+  contact: {
+    title: 'Contact Us',
+    content: 'Reach us at support@haraceylon.com',
+  },
+};
+
+app.get('/api/pages/:slug/', (req, res): any => {
+  const page = PAGES[req.params.slug];
+  if (!page) return res.status(404).json({ error: 'Page not found' });
+  res.json(page);
+});
+
+// Contact form submission
+app.post('/api/pages/contact/submit/', (req, res) => {
+  // Log the message server-side; integrate email service later
+  const { name, email, message } = req.body;
+  console.log(`[Contact Form] From: ${name} <${email}>: ${message}`);
+  res.json({ message: 'Thank you for your message. We will be in touch shortly.' });
+});
+
+// Newsletter subscription
+app.post('/api/account/newsletter/subscribe/', (req, res) => {
+  const { email } = req.body;
+  console.log(`[Newsletter] Subscribed: ${email}`);
+  res.json({ message: 'Successfully subscribed to our newsletter.' });
 });
 
 app.listen(port, () => {

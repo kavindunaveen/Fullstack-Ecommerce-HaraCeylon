@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Search, ShoppingBag, User, Menu, X, LogOut, Package, Settings, ChevronDown, Loader2, Heart } from 'lucide-react';
 import { useCartStore, useAuthStore, useCurrencyStore } from '@/lib/store';
 import { usePathname, useRouter } from 'next/navigation';
-import { productsApi } from '@/lib/api';
+import { productsApi, authApi } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Header() {
@@ -70,10 +70,19 @@ export default function Header() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const handleLogout = () => {
-    clearAuth();
-    router.push('/');
-    setAccountOpen(false);
+  const handleLogout = async () => {
+    try {
+      const refresh = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
+      if (refresh) {
+        await authApi.logout();
+      }
+    } catch {
+      // Even if API call fails, still clear local state
+    } finally {
+      clearAuth();
+      router.push('/');
+      setAccountOpen(false);
+    }
   };
 
   const handleSearch = (e: React.FormEvent) => {

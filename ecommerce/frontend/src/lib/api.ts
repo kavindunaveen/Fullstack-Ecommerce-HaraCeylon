@@ -119,7 +119,10 @@ export const accountApi = {
 export const authApi = {
   login: (data: object) => api.post('/auth/login/', data),
   register: (data: object) => api.post('/auth/registration/', data),
-  logout: () => api.post('/auth/logout/'),
+  logout: () => {
+    const refresh = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
+    return api.post('/auth/logout/', { refresh });
+  },
   forgotPassword: (data: object) => api.post('/auth/password/reset/', data),
   resetPassword: (data: object) => api.post('/auth/password/reset/confirm/', data),
 };

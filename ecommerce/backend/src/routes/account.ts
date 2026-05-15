@@ -4,6 +4,14 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
+// Converts stored relative image path to absolute URL
+const toAbsoluteUrl = (url: string | undefined | null): string | null => {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  const base = process.env.BACKEND_URL || 'http://localhost:8001';
+  return `${base}${url}`;
+};
+
 // ── User Profile ─────────────────────────────────────────────
 
 router.get('/user/', authenticate, async (req: AuthRequest, res): Promise<any> => {
@@ -182,7 +190,9 @@ router.get('/orders/', authenticate, async (req: AuthRequest, res): Promise<any>
       grand_total: order.totalAmount,
       items: order.items.map(item => ({
         product_name_snapshot: item.product.name,
-        image_url_snapshot: item.product.images.find(i => i.isMain)?.imageUrl || item.product.images[0]?.imageUrl || null,
+        image_url_snapshot: toAbsoluteUrl(
+          item.product.images.find(i => i.isMain)?.imageUrl || item.product.images[0]?.imageUrl || null
+        ),
         quantity: item.quantity,
         price: item.price,
       })),
@@ -224,7 +234,9 @@ router.get('/orders/:orderNumber/', authenticate, async (req: AuthRequest, res):
       items: order.items.map((item: any) => ({
         id: item.id,
         product_name_snapshot: item.product.name,
-        image_url_snapshot: item.product.images.find((i: any) => i.isMain)?.imageUrl || item.product.images[0]?.imageUrl || null,
+        image_url_snapshot: toAbsoluteUrl(
+          item.product.images.find((i: any) => i.isMain)?.imageUrl || item.product.images[0]?.imageUrl || null
+        ),
         quantity: item.quantity,
         unit_price: item.price,
         total_price: item.price * item.quantity,

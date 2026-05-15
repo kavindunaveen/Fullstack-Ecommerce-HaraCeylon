@@ -5,6 +5,14 @@ import { DEFAULT_RATES, DOMESTIC_RATES } from './shipping';
 
 const router = Router();
 
+// Converts stored relative image path to absolute URL
+const toAbsoluteUrl = (url: string | undefined | null): string | null => {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  const base = process.env.BACKEND_URL || 'http://localhost:8001';
+  return `${base}${url}`;
+};
+
 // Checkout
 router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): Promise<any> => {
   try {
@@ -220,7 +228,9 @@ router.get('/:orderNumber/', optionalAuthenticate, async (req: AuthRequest, res)
       items: order.items.map(item => ({
         id: item.id,
         product_name_snapshot: item.product.name,
-        image_url_snapshot: item.product.images.find(i => i.isMain)?.imageUrl || item.product.images[0]?.imageUrl || null,
+        image_url_snapshot: toAbsoluteUrl(
+          item.product.images.find(i => i.isMain)?.imageUrl || item.product.images[0]?.imageUrl || null
+        ),
         quantity: item.quantity,
         unit_price: item.price,
         total_price: item.price * item.quantity

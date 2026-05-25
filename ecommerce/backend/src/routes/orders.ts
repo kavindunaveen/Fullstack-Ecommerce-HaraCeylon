@@ -220,9 +220,9 @@ router.get('/:orderNumber/', optionalAuthenticate, async (req: AuthRequest, res)
       currency: order.currency,
       items: order.items.map(item => ({
         id: item.id,
-        product_name_snapshot: item.product.name,
+        product_name_snapshot: item.product?.name || 'Unknown Product',
         image_url_snapshot: toAbsoluteUrl(
-          item.product.images.find(i => i.isMain)?.imageUrl || item.product.images[0]?.imageUrl || null
+          item.product?.images?.find(i => i.isMain)?.imageUrl || item.product?.images?.[0]?.imageUrl || null
         ),
         quantity: item.quantity,
         unit_price: item.price,

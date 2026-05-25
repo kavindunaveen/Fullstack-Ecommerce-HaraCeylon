@@ -182,9 +182,9 @@ router.get('/orders/', authenticate, async (req: AuthRequest, res): Promise<any>
       created_at: order.createdAt,
       grand_total: order.totalAmount,
       items: order.items.map(item => ({
-        product_name_snapshot: item.product.name,
+        product_name_snapshot: item.product?.name || 'Unknown Product',
         image_url_snapshot: toAbsoluteUrl(
-          item.product.images.find(i => i.isMain)?.imageUrl || item.product.images[0]?.imageUrl || null
+          item.product?.images?.find(i => i.isMain)?.imageUrl || item.product?.images?.[0]?.imageUrl || null
         ),
         quantity: item.quantity,
         price: item.price,
@@ -226,9 +226,9 @@ router.get('/orders/:orderNumber/', authenticate, async (req: AuthRequest, res):
       customer_note: order.customerNote,
       items: order.items.map((item: any) => ({
         id: item.id,
-        product_name_snapshot: item.product.name,
+        product_name_snapshot: item.product?.name || 'Unknown Product',
         image_url_snapshot: toAbsoluteUrl(
-          item.product.images.find((i: any) => i.isMain)?.imageUrl || item.product.images[0]?.imageUrl || null
+          item.product?.images?.find((i: any) => i.isMain)?.imageUrl || item.product?.images?.[0]?.imageUrl || null
         ),
         quantity: item.quantity,
         unit_price: item.price,

@@ -17,14 +17,6 @@ interface Product {
   main_image?: { image_url: string };
 }
 
-// Dummy data fallback
-const INITIAL_PRODUCTS: Product[] = [
-  { id: '1', slug: 'premium-ceylon-black', category_name: 'Tea', name: 'Premium Ceylon Black', effective_price: 15.00, main_image: { image_url: '/PREMIUM-BLACK-TEA.png' } },
-  { id: '2', slug: 'premium-green-tea', category_name: 'Tea', name: 'Premium Green Tea', effective_price: 16.50, main_image: { image_url: '/PREMIUM-GREEN-TEA.png' } },
-  { id: '3', slug: 'arabica-extra-fine', category_name: 'Coffee', name: 'Arabica Extra Fine Medium Roasted', effective_price: 22.00, main_image: { image_url: '/Arabica-Extra-Fine-Medium-Roasted-Coffee.png' } },
-  { id: '4', slug: 'arabica-medium-dark', category_name: 'Coffee', name: 'Arabica Medium Dark Roasted', effective_price: 24.00, main_image: { image_url: '/Arabica-Medium-Dark-Rosated-Coffee.png' } }
-];
-
 const staggerContainer: Variants = {
   hidden: { opacity: 0 },
   show: { opacity: 1, transition: { staggerChildren: 0.1 } }
@@ -36,15 +28,20 @@ const itemAnim: Variants = {
 };
 
 export default function Home() {
-  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const { setCart, openCart } = useCartStore();
   const { formatPrice } = useCurrencyStore();
 
   useEffect(() => {
     productsApi.featured().then((res) => {
       const data = res.data.results || res.data || [];
-      if (data.length > 0) setProducts(data);
-    }).catch(console.error);
+      setProducts(data);
+    }).catch((err) => {
+      console.error(err);
+    }).finally(() => {
+      setLoading(false);
+    });
   }, []);
 
   const addToCart = async (e: React.MouseEvent, product: Product) => {
@@ -142,8 +139,21 @@ export default function Home() {
             </Link>
           </div>
 
-          <motion.div variants={staggerContainer} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-100px" }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {products.map((product) => (
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="bg-gray-200 rounded-3xl aspect-[4/5] mb-6"></div>
+                  <div className="h-6 bg-gray-200 rounded w-3/4 mb-2"></div>
+                  <div className="h-5 bg-gray-200 rounded w-1/4"></div>
+                </div>
+              ))}
+            </div>
+          ) : products.length === 0 ? (
+            <div className="text-center py-20 text-gray-400">No featured products available at the moment.</div>
+          ) : (
+            <motion.div variants={staggerContainer} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-100px" }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+              {products.map((product) => (
               <motion.div variants={itemAnim} key={product.id} className="group cursor-pointer">
                 <Link href={`/products/${product.slug}`} className="block relative bg-white rounded-3xl overflow-hidden aspect-[4/5] mb-6 transition-all duration-500 shadow-sm hover:shadow-xl group-hover:-translate-y-2">
                   <div className="absolute inset-0 bg-gray-50/50 group-hover:bg-transparent transition-colors z-0"></div>
@@ -181,6 +191,7 @@ export default function Home() {
               </motion.div>
             ))}
           </motion.div>
+          )}
         </div>
       </section>
 

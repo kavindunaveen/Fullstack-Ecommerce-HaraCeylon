@@ -83,7 +83,7 @@ const formatProduct = (p: any, detail = false) => {
   const formatImg = (img: any) => {
     if (!img) return null;
     let url = img.imageUrl;
-    if (url && !url.startsWith('http')) {
+    if (url && !url.startsWith('http') && url.startsWith('/uploads')) {
       url = `${BACKEND_URL}${url}`;
     }
     return { image_url: url, is_main: img.isMain, alt_text: p.name };

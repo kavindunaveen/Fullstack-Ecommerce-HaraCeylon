@@ -216,7 +216,7 @@ export default function ProductForm() {
                 {formData.imageUrl && (
                   <div className="relative w-full aspect-square rounded-2xl overflow-hidden bg-gray-50 border border-gray-100 shadow-inner group">
                     <Image 
-                      src={formData.imageUrl.startsWith('http') ? formData.imageUrl : `${BACKEND_URL}${formData.imageUrl}`} 
+                      src={formData.imageUrl.startsWith('http') ? formData.imageUrl : (formData.imageUrl.startsWith('/uploads') ? `${BACKEND_URL}${formData.imageUrl}` : formData.imageUrl)} 
                       alt="Preview" 
                       width={200}
                       height={200}

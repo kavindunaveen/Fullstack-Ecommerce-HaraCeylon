@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import prisma from '../prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { toAbsoluteUrl } from '../utils';
 
 const router = Router();
 
@@ -49,13 +50,6 @@ const resolveCart = async (req: AuthRequest, res: any, next: any) => {
   }
 };
 
-// Converts a stored image path (e.g. /uploads/img.jpg) into a full URL
-const toAbsoluteUrl = (url: string | undefined | null): string | null => {
-  if (!url) return null;
-  if (url.startsWith('http')) return url;
-  const base = process.env.BACKEND_URL || 'http://localhost:8001';
-  return `${base}${url}`;
-};
 
 const formatCart = async (cartId: string) => {
   const items = await prisma.cartItem.findMany({

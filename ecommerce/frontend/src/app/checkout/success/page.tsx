@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { checkoutApi } from '@/lib/api';
 import { useCurrencyStore } from '@/lib/store';
 import Link from 'next/link';
+import Image from 'next/image';
 import { 
   CheckCircle2, Package, ArrowRight, ShoppingBag, 
   Mail, Truck, ChevronRight, Share2, MapPin
@@ -82,9 +83,11 @@ function SuccessContent() {
                       <div key={idx} className="flex items-center gap-4 group">
                         <div className="w-14 h-14 bg-gray-50 rounded-2xl border border-gray-100 p-1.5 flex items-center justify-center shrink-0">
                           {item.image_url_snapshot && (
-                            <img 
+                            <Image 
                               src={item.image_url_snapshot} 
                               alt="" 
+                              width={48}
+                              height={48}
                               className="w-full h-full object-contain" 
                             />
                           )}

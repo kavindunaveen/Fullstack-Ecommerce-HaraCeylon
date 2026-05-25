@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { productsApi, cartApi } from '@/lib/api';
 import { ShoppingBag, Heart, ArrowRight, CheckCircle2, ChevronRight, Share2, ShieldCheck, Truck } from 'lucide-react';
 import { useCartStore, useWishlistStore } from '@/lib/store';
@@ -129,7 +130,14 @@ export default function ProductDetailPage() {
                 className="relative aspect-square bg-white rounded-3xl overflow-hidden mb-6 flex-1 shadow-sm border border-gray-100 flex items-center justify-center p-8"
               >
                 {activeImage ? (
-                  <img src={activeImage} alt={product.name} className="w-full h-full object-contain" />
+                  <Image
+                    src={activeImage}
+                    alt={product.name}
+                    width={600}
+                    height={600}
+                    className="w-full h-full object-contain"
+                    priority
+                  />
                 ) : (
                   <div className="text-gray-400">No Image</div>
                 )}
@@ -149,7 +157,7 @@ export default function ProductDetailPage() {
                       onClick={() => setActiveImage(img.image_url)}
                       className={`relative w-20 h-20 rounded-2xl overflow-hidden shrink-0 border-2 transition-all duration-300 bg-white ${activeImage === img.image_url ? 'border-brand-gold shadow-md' : 'border-transparent hover:border-gray-300'}`}
                     >
-                      <img src={img.image_url} alt="" className="w-full h-full object-contain p-2" />
+                      <Image src={img.image_url} alt="" width={80} height={80} className="w-full h-full object-contain p-2" />
                     </button>
                   ))}
                 </div>

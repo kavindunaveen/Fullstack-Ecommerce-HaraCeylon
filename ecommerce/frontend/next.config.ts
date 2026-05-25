@@ -5,20 +5,12 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       // Allow images from the live Hostinger backend
-      { protocol: 'https', hostname: 'api.haraceylon.com', pathname: '/uploads/**' },
+      { protocol: 'https', hostname: 'api.haraceylon.com', pathname: '/**' },
       // Allow images from local dev backend
-      { protocol: 'http', hostname: 'localhost', port: '8001', pathname: '/uploads/**' },
+      { protocol: 'http', hostname: 'localhost', port: '8001', pathname: '/**' },
     ],
     // Serve WebP format automatically for 20-30% smaller files
     formats: ['image/webp', 'image/avif'],
-  },
-  eslint: {
-    // Allow production builds even with ESLint warnings
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    // Allow production builds even with minor TS errors
-    ignoreBuildErrors: true,
   },
 };
 

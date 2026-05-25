@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useWishlistStore, useCartStore, useCurrencyStore } from '@/lib/store';
 import { productsApi, cartApi } from '@/lib/api';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Heart, ShoppingBag, Trash2, ArrowRight, Package } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
@@ -99,7 +100,7 @@ export default function WishlistPage() {
                 >
                   <Link href={`/products/${product.slug}`} className="w-24 h-24 bg-gray-50 rounded-2xl overflow-hidden shrink-0 flex items-center justify-center p-2 group-hover:scale-105 transition-transform">
                     {product.main_image ? (
-                      <img src={product.main_image.image_url} alt={product.name} className="w-full h-full object-contain" />
+                      <Image src={product.main_image.image_url} alt={product.name} width={96} height={96} className="w-full h-full object-contain" />
                     ) : (
                       <Package size={24} className="text-gray-300" />
                     )}

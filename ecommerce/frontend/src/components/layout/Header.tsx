@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { Search, ShoppingBag, User, Menu, X, LogOut, Package, Settings, ChevronDown, Loader2, Heart } from 'lucide-react';
 import { useCartStore, useAuthStore, useCurrencyStore } from '@/lib/store';
@@ -335,7 +336,7 @@ export default function Header() {
                         >
                           <div className="w-12 h-12 bg-gray-50 rounded-lg p-1 border border-gray-100 flex items-center justify-center shrink-0">
                             {p.main_image?.image_url && (
-                              <img src={p.main_image.image_url} alt="" className="w-full h-full object-contain" />
+                              <Image src={p.main_image.image_url} alt="" width={48} height={48} className="w-full h-full object-contain" />
                             )}
                           </div>
                           <div className="flex-1 min-w-0">

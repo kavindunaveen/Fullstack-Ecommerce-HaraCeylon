@@ -1,6 +1,7 @@
 'use client';
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { categoriesApi, productsApi, cartApi } from '@/lib/api';
 import { ShoppingBag, ArrowRight, Filter } from 'lucide-react';
 import { useCartStore, useCurrencyStore } from '@/lib/store';
@@ -134,7 +135,13 @@ function ShopContent() {
                   <Link href={`/products/${product.slug}`} className="block relative bg-white rounded-3xl overflow-hidden aspect-[4/5] mb-6 transition-all duration-500 shadow-sm hover:shadow-xl group-hover:-translate-y-2">
                     <div className="absolute inset-0 bg-gray-50/50 group-hover:bg-transparent transition-colors z-0"></div>
                     {product.main_image ? (
-                      <img src={product.main_image.image_url} alt={product.name} className="w-full h-full object-contain p-8 relative z-10 transition-transform duration-700 group-hover:scale-110" />
+                      <Image
+                        src={product.main_image.image_url}
+                        alt={product.name}
+                        width={400}
+                        height={500}
+                        className="w-full h-full object-contain p-8 relative z-10 transition-transform duration-700 group-hover:scale-110"
+                      />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-400 relative z-10">No Image</div>
                     )}
@@ -143,7 +150,7 @@ function ShopContent() {
                         {product.category_name}
                       </span>
                       <div className="bg-brand-dark/90 backdrop-blur p-1 rounded-lg w-fit shadow-sm border border-white/10">
-                        <img src="/logo.png" alt="Hara" className="h-4 w-auto" />
+                        <Image src="/logo.png" alt="Hara" width={64} height={16} className="h-4 w-auto" />
                       </div>
                     </div>
                     

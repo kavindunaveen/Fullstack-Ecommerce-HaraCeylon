@@ -8,6 +8,7 @@ import {
   Truck, Clock, CheckCircle2, XCircle, Printer
 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import toast from 'react-hot-toast';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
@@ -126,9 +127,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderNum
                   <div key={item.id} className="flex gap-6 pb-6 border-b border-gray-50 last:border-0 last:pb-0">
                     <div className="w-20 h-20 bg-gray-50 rounded-2xl p-2 flex items-center justify-center shrink-0 border border-gray-100">
                       {item.image_url_snapshot && (
-                        <img 
+                        <Image 
                           src={item.image_url_snapshot} 
                           alt={item.product_name_snapshot} 
+                          width={64}
+                          height={64}
                           className="w-full h-full object-contain" 
                         />
                       )}

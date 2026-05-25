@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import morgan from 'morgan';
+import compression from 'compression';
 import prisma from './prisma';
 
 dotenv.config();
@@ -15,7 +16,11 @@ const port = process.env.PORT || 8001;
 // Disable it so /path and /path/ are treated identically.
 app.set('strict routing', false);
 
-// Production CORS configuration
+// ── Compression middleware ─────────────────────────────────────
+// Gzip/Brotli all responses — typically reduces JSON payload by 60-80%
+app.use(compression());
+
+// ── CORS ───────────────────────────────────────────────────────
 const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000').split(',');
 app.use(cors({ 
   origin: (origin, callback) => {
@@ -30,7 +35,14 @@ app.use(cors({
 }));
 
 app.use(express.json());
-app.use(morgan('dev'));
+
+// ── Logging ────────────────────────────────────────────────────
+// Use verbose logging in dev, compact in production (saves CPU + disk I/O)
+if (process.env.NODE_ENV !== 'production') {
+  app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined'));
+}
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -102,9 +114,20 @@ const formatProduct = (p: any, detail = false) => {
   return base;
 };
 
+// ── Cache-Control helper ───────────────────────────────────────
+// Adds HTTP caching headers so browsers and CDNs cache the response.
+// max-age=60: fresh for 60s; stale-while-revalidate=300: serve stale for 5min while revalidating in BG
+const setProductCache = (res: any) => {
+  res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+};
+
+// ── Products list (with pagination) ───────────────────────────
 app.get('/api/products', async (req, res) => {
   try {
-    const { search, category, ids } = req.query;
+    const { search, category, ids, page, limit } = req.query;
+    const pageNum = Math.max(1, parseInt(page as string) || 1);
+    const limitNum = Math.min(100, parseInt(limit as string) || 20);
+    
     const whereClause: any = {};
     if (search && typeof search === 'string') {
       whereClause.name = { contains: search };
@@ -115,11 +138,25 @@ app.get('/api/products', async (req, res) => {
     if (ids && typeof ids === 'string') {
       whereClause.id = { in: ids.split(',') };
     }
-    const products = await prisma.product.findMany({
-      where: whereClause,
-      include: { category: true, images: true }
+
+    const [products, total] = await Promise.all([
+      prisma.product.findMany({
+        where: whereClause,
+        include: { category: true, images: true },
+        orderBy: { createdAt: 'desc' },
+        take: limitNum,
+        skip: (pageNum - 1) * limitNum,
+      }),
+      prisma.product.count({ where: whereClause }),
+    ]);
+
+    setProductCache(res);
+    res.json({
+      results: products.map(p => formatProduct(p)),
+      count: total,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitNum),
     });
-    res.json({ results: products.map(p => formatProduct(p)) });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to fetch products' });
@@ -133,6 +170,7 @@ const featuredHandler = async (req: any, res: any) => {
       where: { isFeatured: true },
       include: { category: true, images: true }
     });
+    setProductCache(res);
     res.json({ results: products.map((p: any) => formatProduct(p)) });
   } catch (error) {
     res.status(500).json({ error: 'Failed' });
@@ -148,6 +186,7 @@ const newArrivalsHandler = async (req: any, res: any) => {
       where: { isNewArrival: true },
       include: { category: true, images: true }
     });
+    setProductCache(res);
     res.json({ results: products.map((p: any) => formatProduct(p)) });
   } catch (error) {
     res.status(500).json({ error: 'Failed' });
@@ -163,6 +202,7 @@ const bestSellersHandler = async (req: any, res: any) => {
       where: { isBestSeller: true },
       include: { category: true, images: true }
     });
+    setProductCache(res);
     res.json({ results: products.map((p: any) => formatProduct(p)) });
   } catch (error) {
     res.status(500).json({ error: 'Failed' });
@@ -175,6 +215,8 @@ app.get('/api/products/best-sellers/', bestSellersHandler);
 const categoriesHandler = async (req: any, res: any) => {
   try {
     const categories = await prisma.category.findMany();
+    // Categories rarely change — cache for longer
+    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600');
     res.json({ results: categories });
   } catch (error) {
     console.error(error);
@@ -193,6 +235,7 @@ app.get('/api/products/:slug', async (req, res): Promise<any> => {
       include: { category: true, images: true }
     });
     if (!product) return res.status(404).json({ error: 'Product not found' });
+    setProductCache(res);
     res.json(formatProduct(product, true));
   } catch (error) {
     console.error(error);
@@ -206,6 +249,8 @@ app.get('/api/products/:slug', async (req, res): Promise<any> => {
 
 // Currencies list (used by currency switcher)
 app.get('/api/products/currencies', (req, res) => {
+  // Currencies are static — cache for a long time
+  res.setHeader('Cache-Control', 'public, max-age=3600');
   res.json([
     { code: 'GBP', symbol: '£', name: 'British Pound', rate: 1 },
     { code: 'USD', symbol: '$', name: 'US Dollar', rate: 1.27 },
@@ -219,6 +264,7 @@ app.get('/api/products/currencies/', (req, res) => res.redirect(301, '/api/produ
 
 // Languages list
 app.get('/api/products/languages', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=3600');
   res.json([{ code: 'en', name: 'English' }]);
 });
 app.get('/api/products/languages/', (req, res) => res.redirect(301, '/api/products/languages'));
@@ -255,6 +301,7 @@ const PAGES: Record<string, { title: string; content: string }> = {
 app.get('/api/pages/:slug/', (req, res): any => {
   const page = PAGES[req.params.slug];
   if (!page) return res.status(404).json({ error: 'Page not found' });
+  res.setHeader('Cache-Control', 'public, max-age=300');
   res.json(page);
 });
 

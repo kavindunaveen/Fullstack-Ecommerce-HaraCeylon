@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { Inter, Playfair_Display } from 'next/font/google';
 import { Providers } from '@/components/Providers';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
@@ -8,16 +9,29 @@ import CartHydrator from '@/components/cart/CartHydrator';
 import MobileNav from '@/components/layout/MobileNav';
 import { Toaster } from 'react-hot-toast';
 
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-sans',
+  display: 'swap',
+});
+
+const playfair = Playfair_Display({
+  subsets: ['latin'],
+  variable: '--font-serif',
+  display: 'swap',
+  style: ['normal', 'italic'],
+});
+
 export const metadata: Metadata = {
-  title: { default: 'HARA Store — Premium International Brand', template: '%s | HARA Store' },
-  description: 'Discover premium products from HARA, a UK-based international brand. Shop worldwide with multi-currency support.',
-  keywords: ['HARA', 'premium store', 'UK brand', 'international shipping'],
-  openGraph: { type: 'website', locale: 'en_GB', siteName: 'HARA Store' },
+  title: { default: 'HARA Ceylon — Premium Tea & Coffee from Sri Lanka', template: '%s | HARA Ceylon' },
+  description: 'Discover premium organic teas and coffees from the highlands of Sri Lanka. Single-origin, 100% natural, shipped worldwide.',
+  keywords: ['HARA Ceylon', 'Ceylon tea', 'Sri Lanka coffee', 'organic tea', 'premium coffee', 'international shipping'],
+  openGraph: { type: 'website', locale: 'en_GB', siteName: 'HARA Ceylon' },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
       <body>
         <Providers>
           <Header />

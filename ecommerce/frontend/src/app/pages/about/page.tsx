@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { CheckCircle2, Leaf, Heart, Globe, Award, Sparkles, ChevronRight, Quote } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
 
 export default function AboutPage() {
   const [activeTab, setActiveTab] = useState('vision');
@@ -25,8 +26,10 @@ export default function AboutPage() {
       <section className="relative min-h-[80vh] flex items-center pt-24 overflow-hidden">
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-brand-dark/40 z-10" />
-          <img 
+          <Image 
             src="/hero-bg.webp" 
+            width={1920}
+            height={1080}
             className="w-full h-full object-cover scale-105 animate-slow-zoom" 
             alt="Tea Plantation" 
           />
@@ -67,7 +70,7 @@ export default function AboutPage() {
             >
               <div className="grid grid-cols-2 gap-6 relative z-10">
                 <div className="space-y-6">
-                  <img src="/Green-tea1.png" className="rounded-3xl shadow-2xl w-full aspect-[3/4] object-cover" alt="Tea Leaves" />
+                  <Image src="/Green-tea1.png" width={400} height={533} className="rounded-3xl shadow-2xl w-full aspect-[3/4] object-cover" alt="Tea Leaves" />
                   <div className="bg-brand-gold p-8 rounded-3xl text-white">
                     <p className="text-4xl font-serif font-bold mb-2">100%</p>
                     <p className="text-xs uppercase tracking-widest font-black opacity-80">Single Origin Selection</p>
@@ -79,7 +82,7 @@ export default function AboutPage() {
                     <p className="text-gray-900 font-bold mb-2 text-xl">Pure Ceylon</p>
                     <p className="text-gray-500 text-sm leading-relaxed">Grown in the misty altitudes of Nuwara Eliya and Dimbula.</p>
                   </div>
-                  <img src="/tea-processing.png" className="rounded-3xl shadow-2xl w-full aspect-[3/4] object-cover" alt="Processing" />
+                  <Image src="/tea-processing.png" width={400} height={533} className="rounded-3xl shadow-2xl w-full aspect-[3/4] object-cover" alt="Processing" />
                 </div>
               </div>
               

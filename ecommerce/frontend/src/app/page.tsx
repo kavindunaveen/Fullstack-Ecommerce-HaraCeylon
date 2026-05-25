@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { productsApi, cartApi } from '@/lib/api';
 import { ArrowRight, ShoppingBag, Leaf, Droplets, Globe2 } from 'lucide-react';
 import { useCartStore, useCurrencyStore } from '@/lib/store';
@@ -67,6 +68,7 @@ export default function Home() {
         <video 
           className="absolute inset-0 w-full h-full object-cover"
           autoPlay muted loop playsInline poster="/hero.png"
+          preload="metadata"
         >
           <source src="/video2.mp4" type="video/mp4" />
         </video>
@@ -146,14 +148,20 @@ export default function Home() {
                 <Link href={`/products/${product.slug}`} className="block relative bg-white rounded-3xl overflow-hidden aspect-[4/5] mb-6 transition-all duration-500 shadow-sm hover:shadow-xl group-hover:-translate-y-2">
                   <div className="absolute inset-0 bg-gray-50/50 group-hover:bg-transparent transition-colors z-0"></div>
                   {product.main_image && (
-                    <img src={product.main_image.image_url} alt={product.name} className="w-full h-full object-contain p-8 relative z-10 transition-transform duration-700 group-hover:scale-110" />
+                    <Image
+                      src={product.main_image.image_url}
+                      alt={product.name}
+                      width={400}
+                      height={500}
+                      className="w-full h-full object-contain p-8 relative z-10 transition-transform duration-700 group-hover:scale-110"
+                    />
                   )}
                   <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
                     <span className="bg-white/90 backdrop-blur text-brand-dark px-3 py-1.5 rounded-full text-[10px] font-bold tracking-wider uppercase shadow-sm">
                       {product.category_name}
                     </span>
                     <div className="bg-brand-dark/90 backdrop-blur p-1 rounded-lg w-fit shadow-sm border border-white/10">
-                      <img src="/logo.png" alt="Hara" className="h-4 w-auto" />
+                      <Image src="/logo.png" alt="Hara" width={64} height={16} className="h-4 w-auto" />
                     </div>
                   </div>
                   
@@ -184,9 +192,22 @@ export default function Home() {
             
             <div className="lg:col-span-6 relative">
               <div className="relative z-10">
-                <img src="/hero-bg.webp" alt="Tea Estate" className="rounded-[2.5rem] shadow-2xl w-full h-[500px] object-cover" />
+                <Image
+                  src="/hero-bg.webp"
+                  alt="Tea Estate"
+                  width={700}
+                  height={500}
+                  className="rounded-[2.5rem] shadow-2xl w-full h-[500px] object-cover"
+                  priority
+                />
                 <div className="absolute -bottom-10 -right-10 w-2/3 hidden md:block">
-                  <img src="/tea-processing.png" alt="Tea Selection" className="rounded-3xl shadow-2xl border-8 border-white object-cover aspect-video" />
+                  <Image
+                    src="/tea-processing.png"
+                    alt="Tea Selection"
+                    width={400}
+                    height={225}
+                    className="rounded-3xl shadow-2xl border-8 border-white object-cover aspect-video"
+                  />
                 </div>
               </div>
               <div className="absolute -top-10 -left-10 w-32 h-32 bg-brand-gold/10 rounded-full blur-2xl -z-10" />

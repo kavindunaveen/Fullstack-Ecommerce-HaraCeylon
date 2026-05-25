@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Save, Loader2, Upload } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function ProductForm() {
   const router = useRouter();
@@ -214,9 +215,11 @@ export default function ProductForm() {
               <div className="space-y-4">
                 {formData.imageUrl && (
                   <div className="relative w-full aspect-square rounded-2xl overflow-hidden bg-gray-50 border border-gray-100 shadow-inner group">
-                    <img 
+                    <Image 
                       src={formData.imageUrl.startsWith('http') ? formData.imageUrl : `${BACKEND_URL}${formData.imageUrl}`} 
                       alt="Preview" 
+                      width={200}
+                      height={200}
                       className="w-full h-full object-contain"
                     />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">

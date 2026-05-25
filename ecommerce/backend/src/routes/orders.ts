@@ -2,16 +2,9 @@ import { Router } from 'express';
 import prisma from '../prisma';
 import { authenticate, optionalAuthenticate, AuthRequest } from '../middleware/auth';
 import { DEFAULT_RATES, DOMESTIC_RATES } from './shipping';
+import { toAbsoluteUrl } from '../utils';
 
 const router = Router();
-
-// Converts stored relative image path to absolute URL
-const toAbsoluteUrl = (url: string | undefined | null): string | null => {
-  if (!url) return null;
-  if (url.startsWith('http')) return url;
-  const base = process.env.BACKEND_URL || 'http://localhost:8001';
-  return `${base}${url}`;
-};
 
 // Checkout
 router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): Promise<any> => {

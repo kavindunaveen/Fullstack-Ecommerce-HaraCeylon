@@ -3,6 +3,7 @@ import { useCartStore, useCurrencyStore } from '@/lib/store';
 import { cartApi } from '@/lib/api';
 import { X, Trash2, ArrowRight, ShoppingBag } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { CartItem } from '@/lib/store';
@@ -82,9 +83,11 @@ export default function CartDrawer() {
                       {/* Product Image */}
                       <div className="w-20 h-20 rounded-xl bg-gray-50 border border-gray-100 shrink-0 p-2 flex items-center justify-center">
                         {item.product?.main_image?.image_url ? (
-                          <img
+                          <Image
                             src={item.product.main_image.image_url}
                             alt={item.product.main_image.alt_text || item.product.name}
+                            width={80}
+                            height={80}
                             className="w-full h-full object-contain"
                           />
                         ) : (

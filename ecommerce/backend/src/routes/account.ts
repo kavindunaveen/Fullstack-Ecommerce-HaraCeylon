@@ -1,16 +1,9 @@
 import { Router } from 'express';
 import prisma from '../prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { toAbsoluteUrl } from '../utils';
 
 const router = Router();
-
-// Converts stored relative image path to absolute URL
-const toAbsoluteUrl = (url: string | undefined | null): string | null => {
-  if (!url) return null;
-  if (url.startsWith('http')) return url;
-  const base = process.env.BACKEND_URL || 'http://localhost:8001';
-  return `${base}${url}`;
-};
 
 // ── User Profile ─────────────────────────────────────────────
 

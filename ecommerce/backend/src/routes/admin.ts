@@ -5,16 +5,10 @@ import prisma from '../prisma';
 import path from 'path';
 import multer from 'multer';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { toAbsoluteUrl } from '../utils';
 
 const router = Router();
 
-// Converts stored relative image path to absolute URL
-const toAbsoluteUrl = (url: string | undefined | null): string | null => {
-  if (!url) return null;
-  if (url.startsWith('http')) return url;
-  const base = process.env.BACKEND_URL || 'http://localhost:8001';
-  return `${base}${url}`;
-};
 
 // Configure Multer for local storage
 const storage = multer.diskStorage({
@@ -106,21 +100,21 @@ router.post('/login', async (req, res): Promise<any> => {
 // Admin Dashboard Stats
 router.get('/stats', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
   try {
-    const totalOrders = await prisma.order.count();
-    const activeProducts = await prisma.product.count();
-    const totalCustomers = await prisma.user.count({ where: { role: 'CUSTOMER' } });
-    
-    const orders = await prisma.order.findMany({ select: { totalAmount: true } });
-    const totalRevenue = orders.reduce((sum, order) => sum + Number(order.totalAmount), 0);
+    // Run all queries in parallel for maximum speed
+    const [totalOrders, activeProducts, totalCustomers, revenueAgg, recentOrders] = await Promise.all([
+      prisma.order.count(),
+      prisma.product.count(),
+      prisma.user.count({ where: { role: 'CUSTOMER' } }),
+      // Use aggregate SUM instead of fetching all order records
+      prisma.order.aggregate({ _sum: { totalAmount: true } }),
+      prisma.order.findMany({
+        take: 10,
+        orderBy: { createdAt: 'desc' },
+        include: { user: { select: { firstName: true, lastName: true } } }
+      }),
+    ]);
 
-    // Recent orders
-    const recentOrders = await prisma.order.findMany({
-      take: 10,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        user: { select: { firstName: true, lastName: true } }
-      }
-    });
+    const totalRevenue = revenueAgg._sum.totalAmount ?? 0;
 
     const formattedRecentOrders = recentOrders.map(order => ({
       id: order.orderNumber,
@@ -132,12 +126,7 @@ router.get('/stats', authenticate, requireAdmin, async (req: AuthRequest, res): 
     }));
 
     res.json({
-      stats: {
-        totalRevenue,
-        totalOrders,
-        activeProducts,
-        totalCustomers,
-      },
+      stats: { totalRevenue, totalOrders, activeProducts, totalCustomers },
       recentOrders: formattedRecentOrders
     });
   } catch (error) {

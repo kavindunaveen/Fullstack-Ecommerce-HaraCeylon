@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useAuthStore, useCurrencyStore } from '@/lib/store';
 import { accountApi, authApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import {
   Package, MapPin, User as UserIcon, LogOut,
   ChevronRight, ShoppingBag, Clock, CheckCircle2,
@@ -250,7 +251,7 @@ export default function AccountPage() {
                           {order.items?.map((item: any, idx: number) => (
                             <div key={idx} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-xl border border-gray-100 group-hover:border-brand-gold/20 transition-all">
                               {item.image_url_snapshot && (
-                                <img src={item.image_url_snapshot} alt="" className="w-5 h-5 object-contain" />
+                                <Image src={item.image_url_snapshot} alt="" width={20} height={20} className="w-5 h-5 object-contain" />
                               )}
                               <span className="text-[11px] font-bold text-gray-700">
                                 {item.product_name_snapshot} <span className="text-gray-400 font-medium">x{item.quantity}</span>

@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { useCurrencyStore } from '@/lib/store';
 import { Plus, Edit2, Trash2, Package, Search } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function AdminProducts() {
   const [products, setProducts] = useState<any[]>([]);
@@ -89,9 +90,11 @@ export default function AdminProducts() {
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 bg-gray-50 rounded-lg overflow-hidden border border-gray-100 flex items-center justify-center p-1">
                         {p.images?.[0] ? (
-                          <img 
+                          <Image 
                             src={p.images[0].imageUrl.startsWith('http') ? p.images[0].imageUrl : `${BACKEND_URL}${p.images[0].imageUrl}`} 
                             alt="" 
+                            width={48}
+                            height={48}
                             className="w-full h-full object-contain" 
                           />
                         ) : <Package size={20} className="text-gray-300" />}

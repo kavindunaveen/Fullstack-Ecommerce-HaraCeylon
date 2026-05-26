@@ -16,8 +16,12 @@ export default function MobileNav() {
     { href: '/account', icon: User, label: 'Account' },
   ];
 
+  // Hide the bottom nav on product detail pages — the sticky action bar replaces it
+  const isProductDetail = pathname.startsWith('/products/') && pathname !== '/products/';
+  if (isProductDetail) return null;
+
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-100 z-[90] pb-safe">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 z-[90]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       <div className="flex justify-around items-center px-2 py-3">
         {links.map(({ href, icon: Icon, label }) => {
           const isActive = pathname === href;

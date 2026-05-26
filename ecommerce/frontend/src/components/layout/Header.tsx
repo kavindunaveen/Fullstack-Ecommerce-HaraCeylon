@@ -2,17 +2,25 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
-import { Search, ShoppingBag, User, Menu, X, LogOut, Package, Settings, ChevronDown, Loader2, Heart } from 'lucide-react';
+import { Search, ShoppingBag, User, Menu, X, LogOut, Package, Settings, ChevronDown, Loader2, Heart, Globe } from 'lucide-react';
 import { useCartStore, useAuthStore, useCurrencyStore } from '@/lib/store';
 import { usePathname, useRouter } from 'next/navigation';
 import { productsApi, authApi } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import CurrencySelector from './CurrencySelector';
 
+const CURRENCIES = [
+  { code: 'USD', symbol: '$', rate: 1, name: 'US Dollar' },
+  { code: 'GBP', symbol: '£', rate: 0.79, name: 'British Pound' },
+  { code: 'EUR', symbol: '€', rate: 0.92, name: 'Euro' },
+  { code: 'AUD', symbol: 'A$', rate: 1.51, name: 'Australian Dollar' },
+  { code: 'LKR', symbol: 'Rs', rate: 300, name: 'Sri Lankan Rupee' },
+];
+
 export default function Header() {
   const { cart, toggleCart } = useCartStore();
   const { isAuthenticated, user, clearAuth } = useAuthStore();
-  const { formatPrice } = useCurrencyStore();
+  const { currency, setCurrency, formatPrice } = useCurrencyStore();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -20,6 +28,7 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [mobileCurrencyOpen, setMobileCurrencyOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
@@ -30,6 +39,16 @@ export default function Header() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Lock body scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileOpen]);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -103,8 +122,8 @@ export default function Header() {
   return (
     <>
       {/* ── Main Header Bar ──────────────────────────────── */}
-      <header className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 ${scrolled ? 'py-3' : 'py-6'} px-4 md:px-8`}>
-        <div className={`max-w-7xl mx-auto flex items-center justify-between rounded-full px-6 py-3 transition-all duration-500 ${
+      <header className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 ${scrolled ? 'py-2 md:py-3' : 'py-4 md:py-6'} px-3 md:px-8`}>
+        <div className={`max-w-7xl mx-auto flex items-center justify-between rounded-full px-4 md:px-6 py-2.5 md:py-3 transition-all duration-500 ${
           scrolled ? 'glass shadow-lg border-white/40' :
           isHome ? 'bg-transparent' : 'glass shadow-sm border-white/20'
         }`}>
@@ -123,42 +142,43 @@ export default function Header() {
           <div className="flex-1 md:hidden">
             <button
               onClick={() => setMobileOpen(true)}
-              className={`p-2 -ml-2 transition-colors ${iconColor}`}
+              className={`p-2 -ml-1 transition-colors touch-target ${iconColor}`}
+              aria-label="Open menu"
             >
-              <Menu strokeWidth={1.5} size={24} />
+              <Menu strokeWidth={1.5} size={22} />
             </button>
           </div>
 
           {/* Logo */}
           <Link href="/" className="flex-shrink-0 relative group">
-            <h1 className={`font-serif text-2xl md:text-3xl font-black tracking-tight transition-colors ${isHome && !scrolled ? 'text-white' : 'text-brand-dark'}`}>
+            <h1 className={`font-serif text-xl md:text-3xl font-black tracking-tight transition-colors ${isHome && !scrolled ? 'text-white' : 'text-brand-dark'}`}>
               HARA <span className="text-brand-gold italic font-light">CEYLON</span>
             </h1>
             <div className="absolute -bottom-1 left-0 w-0 h-[2px] bg-brand-gold transition-all duration-300 group-hover:w-full" />
           </Link>
 
           {/* Right Actions */}
-          <div className="flex items-center justify-end gap-1 sm:gap-3 flex-1">
-            {/* Currency Selector */}
+          <div className="flex items-center justify-end gap-0.5 sm:gap-2 flex-1">
+            {/* Currency Selector (desktop only — hidden on mobile via component) */}
             <CurrencySelector iconColor={iconColor} />
 
             {/* Search button */}
             <button
               onClick={() => setSearchOpen(v => !v)}
               aria-label="Search"
-              className={`p-2 transition-colors hover:text-brand-gold ${iconColor} ${searchOpen ? 'text-brand-gold' : ''}`}
+              className={`touch-target p-1.5 transition-colors hover:text-brand-gold ${iconColor} ${searchOpen ? 'text-brand-gold' : ''}`}
             >
-              <Search strokeWidth={1.5} size={20} />
+              <Search strokeWidth={1.5} size={19} />
             </button>
 
-            {/* Account Dropdown */}
-            <div className="relative" ref={accountMenuRef}>
+            {/* Account Dropdown (desktop) */}
+            <div className="relative hidden md:block" ref={accountMenuRef}>
               <button
                 onMouseEnter={() => !mobileOpen && setAccountOpen(true)}
                 onClick={() => setAccountOpen(v => !v)}
-                className={`p-2 transition-colors hover:text-brand-gold flex items-center gap-1 ${iconColor} ${accountOpen ? 'text-brand-gold' : ''}`}
+                className={`p-1.5 transition-colors hover:text-brand-gold flex items-center gap-1 ${iconColor} ${accountOpen ? 'text-brand-gold' : ''}`}
               >
-                <User strokeWidth={1.5} size={20} />
+                <User strokeWidth={1.5} size={19} />
                 {isAuthenticated && user && (
                   <ChevronDown size={12} className={`transition-transform duration-300 ${accountOpen ? 'rotate-180' : ''}`} />
                 )}
@@ -239,14 +259,24 @@ export default function Header() {
               </AnimatePresence>
             </div>
 
+            {/* Account Icon (mobile only — taps to account page) */}
+            <Link
+              href={isAuthenticated ? '/account' : '/account/login'}
+              className={`touch-target p-1.5 transition-colors hover:text-brand-gold md:hidden ${iconColor}`}
+              aria-label="Account"
+            >
+              <User strokeWidth={1.5} size={19} />
+            </Link>
+
             {/* Cart */}
             <button
               onClick={toggleCart}
-              className={`relative flex items-center gap-2 p-2 transition-colors hover:text-brand-gold ${iconColor}`}
+              className={`relative touch-target p-1.5 transition-colors hover:text-brand-gold ${iconColor}`}
+              aria-label="Shopping bag"
             >
-              <ShoppingBag strokeWidth={1.5} size={20} />
+              <ShoppingBag strokeWidth={1.5} size={19} />
               {itemCount > 0 && (
-                <span className="absolute top-0 right-0 bg-brand-gold text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full border border-white">
+                <span className="absolute top-0.5 right-0.5 bg-brand-gold text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full border border-white">
                   {itemCount}
                 </span>
               )}
@@ -274,13 +304,13 @@ export default function Header() {
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: -20, opacity: 0 }}
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-              className="fixed top-0 left-0 right-0 z-[99] bg-white shadow-2xl px-4 pt-24 pb-8 md:px-12"
+              className="fixed top-0 left-0 right-0 z-[99] bg-white shadow-2xl px-4 pt-20 md:pt-24 pb-6 md:pb-8 md:px-12"
             >
               <form onSubmit={handleSearch} className="max-w-3xl mx-auto">
                 <div className="relative">
                   <Search
-                    size={20}
-                    className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                    size={18}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
                   />
                   <input
                     ref={searchInputRef}
@@ -288,28 +318,29 @@ export default function Header() {
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     placeholder="Search teas, coffees, products…"
-                    className="w-full pl-14 pr-16 py-5 text-lg bg-gray-50 border-2 border-gray-100 rounded-2xl focus:outline-none focus:border-brand-gold focus:bg-white transition-all font-light text-gray-900 placeholder:text-gray-400"
+                    className="w-full pl-12 pr-14 py-4 md:py-5 text-base md:text-lg bg-gray-50 border-2 border-gray-100 rounded-2xl focus:outline-none focus:border-brand-gold focus:bg-white transition-all font-light text-gray-900 placeholder:text-gray-400"
+                    autoFocus
                   />
                   {searchQuery && (
                     <button
                       type="button"
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-5 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-100 rounded-full text-gray-400"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-100 rounded-full text-gray-400"
                     >
                       {searchLoading ? <Loader2 className="animate-spin" size={16} /> : <X size={16} />}
                     </button>
                   )}
                 </div>
 
-                <div className="flex items-center justify-between mt-4 px-1">
-                  <p className="text-xs text-gray-400">
+                <div className="flex items-center justify-between mt-3 px-1">
+                  <p className="text-xs text-gray-400 hidden sm:block">
                     Press <kbd className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-500 font-mono">Enter</kbd> to search &nbsp;·&nbsp;{' '}
                     <kbd className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-500 font-mono">Esc</kbd> to close
                   </p>
                   <button
                     type="submit"
                     disabled={!searchQuery.trim()}
-                    className="text-sm font-bold text-brand-gold disabled:opacity-40 hover:text-brand-dark transition-colors"
+                    className="text-sm font-bold text-brand-gold disabled:opacity-40 hover:text-brand-dark transition-colors ml-auto"
                   >
                     Search →
                   </button>
@@ -324,7 +355,7 @@ export default function Header() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
-                    className="max-w-3xl mx-auto mt-6 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden"
+                    className="max-w-3xl mx-auto mt-4 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden"
                   >
                     <div className="p-2">
                       <div className="px-4 py-3 border-b border-gray-50 mb-1 flex items-center justify-between">
@@ -338,9 +369,9 @@ export default function Header() {
                           onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
                           className="flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-gray-50 transition-colors group"
                         >
-                          <div className="w-12 h-12 bg-gray-50 rounded-lg p-1 border border-gray-100 flex items-center justify-center shrink-0">
+                          <div className="w-10 h-10 bg-gray-50 rounded-lg p-1 border border-gray-100 flex items-center justify-center shrink-0">
                             {p.main_image?.image_url && (
-                              <Image src={p.main_image.image_url} alt="" width={48} height={48} className="w-full h-full object-contain" />
+                              <Image src={p.main_image.image_url} alt="" width={40} height={40} className="w-full h-full object-contain" />
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -365,7 +396,7 @@ export default function Header() {
 
               {/* Quick Links */}
               {(!searchQuery || searchResults.length === 0) && (
-                <div className="max-w-3xl mx-auto mt-6 flex flex-wrap gap-2">
+                <div className="max-w-3xl mx-auto mt-4 flex flex-wrap gap-2">
                   <span className="text-xs text-gray-400 font-medium mr-1 py-1.5">Popular:</span>
                   {['Black Tea', 'Green Tea', 'Arabica Coffee', 'Ceylon'].map(term => (
                     <button
@@ -394,28 +425,33 @@ export default function Header() {
           <>
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-brand-dark/95 backdrop-blur-xl z-[101]"
+              className="fixed inset-0 bg-brand-dark/70 backdrop-blur-md z-[101]"
               onClick={() => setMobileOpen(false)}
             />
             <motion.div
-              initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 left-0 bottom-0 w-4/5 max-w-sm bg-white z-[102] flex flex-col"
+              initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} transition={{ type: 'spring', damping: 26, stiffness: 220 }}
+              className="fixed top-0 left-0 bottom-0 w-[85vw] max-w-[340px] bg-white z-[102] flex flex-col shadow-2xl"
             >
-              <div className="p-6 flex items-center justify-between border-b border-gray-100">
-                <div className="flex flex-col">
-                  <span className="font-serif text-2xl font-black text-brand-dark leading-none">HARA</span>
-                  <span className="text-[10px] font-bold text-brand-gold tracking-[0.4em] uppercase mt-1">Ceylon</span>
-                </div>
-                <button onClick={() => setMobileOpen(false)} className="p-2 text-gray-500 hover:text-brand-dark rounded-full bg-gray-50">
+              {/* Mobile Menu Header */}
+              <div className="p-5 flex items-center justify-between border-b border-gray-100 safe-top">
+                <Link href="/" onClick={() => setMobileOpen(false)} className="flex flex-col leading-none">
+                  <span className="font-serif text-2xl font-black text-brand-dark">HARA</span>
+                  <span className="text-[10px] font-bold text-brand-gold tracking-[0.4em] uppercase mt-0.5">Ceylon</span>
+                </Link>
+                <button
+                  onClick={() => setMobileOpen(false)}
+                  className="touch-target p-2 text-gray-500 hover:text-brand-dark rounded-full bg-gray-50 hover:bg-gray-100 transition-colors"
+                  aria-label="Close menu"
+                >
                   <X size={20} />
                 </button>
               </div>
 
-              {/* Mobile search */}
-              <div className="px-6 pt-5">
+              {/* Mobile Search */}
+              <div className="px-5 pt-4 pb-3 border-b border-gray-50">
                 <form onSubmit={(e) => { e.preventDefault(); const q = searchQuery.trim(); if (q) { router.push(`/products?search=${encodeURIComponent(q)}`); setMobileOpen(false); setSearchQuery(''); } }}>
                   <div className="relative">
-                    <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                     <input
                       type="text"
                       value={searchQuery}
@@ -427,19 +463,106 @@ export default function Header() {
                 </form>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6 mt-2">
-                <Link href="/" onClick={() => setMobileOpen(false)} className="text-3xl font-serif text-gray-900 hover:text-brand-gold transition-colors">Home</Link>
-                <Link href="/products" onClick={() => setMobileOpen(false)} className="text-3xl font-serif text-gray-900 hover:text-brand-gold transition-colors">Shop</Link>
-                <Link href="/pages/about" onClick={() => setMobileOpen(false)} className="text-3xl font-serif text-gray-900 hover:text-brand-gold transition-colors">Our Story</Link>
-                <Link href="/pages/contact" onClick={() => setMobileOpen(false)} className="text-3xl font-serif text-gray-900 hover:text-brand-gold transition-colors">Contact</Link>
+              {/* Navigation Links */}
+              <div className="flex-1 overflow-y-auto">
+                <nav className="p-5 flex flex-col gap-1">
+                  {[
+                    { href: '/', label: 'Home' },
+                    { href: '/products', label: 'Shop' },
+                    { href: '/pages/about', label: 'Our Story' },
+                    { href: '/pages/contact', label: 'Contact' },
+                  ].map(({ href, label }) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      onClick={() => setMobileOpen(false)}
+                      className="flex items-center justify-between px-4 py-3.5 rounded-2xl text-gray-800 hover:bg-gray-50 hover:text-brand-gold transition-all group"
+                    >
+                      <span className="font-serif text-2xl font-medium">{label}</span>
+                      <ChevronDown size={16} className="-rotate-90 text-gray-300 group-hover:text-brand-gold transition-colors" />
+                    </Link>
+                  ))}
+                </nav>
+
+                {/* Currency Picker in Mobile Menu */}
+                <div className="mx-5 mb-4 bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                  <button
+                    onClick={() => setMobileCurrencyOpen(v => !v)}
+                    className="w-full flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Globe size={16} className="text-brand-gold" />
+                      <span className="text-sm font-bold text-gray-700">Currency</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-black text-brand-gold">{currency}</span>
+                      <ChevronDown size={14} className={`text-gray-400 transition-transform ${mobileCurrencyOpen ? 'rotate-180' : ''}`} />
+                    </div>
+                  </button>
+
+                  <AnimatePresence>
+                    {mobileCurrencyOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-2 gap-2">
+                          {CURRENCIES.map((c) => (
+                            <button
+                              key={c.code}
+                              onClick={() => { setCurrency(c.code, c.symbol, c.rate); setMobileCurrencyOpen(false); }}
+                              className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                                currency === c.code
+                                  ? 'bg-brand-gold text-white font-bold shadow-sm'
+                                  : 'bg-white text-gray-600 border border-gray-200 hover:border-brand-gold/50'
+                              }`}
+                            >
+                              <span className="font-bold">{c.symbol}</span>
+                              <span>{c.code}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
-              <div className="p-6 border-t border-gray-100 bg-gray-50">
-                <Link href={isAuthenticated ? '/account' : '/account/login'} onClick={() => setMobileOpen(false)} className="flex items-center gap-3 text-brand-dark font-medium">
-                  <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm">
-                    <User size={18} />
+
+              {/* Mobile Menu Footer — Account */}
+              <div className="p-5 border-t border-gray-100 bg-gray-50 safe-bottom">
+                {isAuthenticated && user ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 px-3 py-2">
+                      <div className="w-9 h-9 rounded-full bg-brand-gold/10 flex items-center justify-center shrink-0">
+                        <User size={16} className="text-brand-gold" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-brand-dark truncate">{user.first_name} {user.last_name}</p>
+                        <p className="text-[11px] text-gray-400 truncate">{user.email}</p>
+                      </div>
+                    </div>
+                    <Link href="/account" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white text-gray-700 border border-gray-100">
+                      <Package size={16} className="text-gray-400" />
+                      <span className="text-sm font-medium">My Orders</span>
+                    </Link>
+                    <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 text-red-500">
+                      <LogOut size={16} />
+                      <span className="text-sm font-bold">Logout</span>
+                    </button>
                   </div>
-                  {isAuthenticated ? 'My Account' : 'Sign In / Register'}
-                </Link>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <Link href="/account/login" onClick={() => setMobileOpen(false)} className="w-full py-3.5 bg-brand-dark text-white rounded-xl text-center text-sm font-bold uppercase tracking-wider hover:bg-brand-gold transition-colors">
+                      Sign In
+                    </Link>
+                    <Link href="/account/login?signup=true" onClick={() => setMobileOpen(false)} className="w-full py-3.5 bg-white text-brand-dark border border-gray-200 rounded-xl text-center text-sm font-bold uppercase tracking-wider hover:bg-gray-50 transition-colors">
+                      Create Account
+                    </Link>
+                  </div>
+                )}
               </div>
             </motion.div>
           </>

@@ -34,7 +34,7 @@ export default function CurrencySelector({ iconColor }: { iconColor: string }) {
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative hidden md:block" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center gap-1.5 p-2 transition-colors hover:text-brand-gold ${iconColor} ${isOpen ? 'text-brand-gold' : ''}`}

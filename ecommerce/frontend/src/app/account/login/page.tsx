@@ -137,7 +137,6 @@ function LoginContent() {
           <GoogleLogin
             onSuccess={handleGoogleSuccess}
             onError={() => toast.error('Google Sign-In failed or was cancelled')}
-            useOneTap
             shape="pill"
             theme="outline"
             size="large"

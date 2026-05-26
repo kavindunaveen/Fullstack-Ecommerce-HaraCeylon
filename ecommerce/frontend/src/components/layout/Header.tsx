@@ -7,6 +7,7 @@ import { useCartStore, useAuthStore, useCurrencyStore } from '@/lib/store';
 import { usePathname, useRouter } from 'next/navigation';
 import { productsApi, authApi } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
+import CurrencySelector from './CurrencySelector';
 
 export default function Header() {
   const { cart, toggleCart } = useCartStore();
@@ -138,6 +139,9 @@ export default function Header() {
 
           {/* Right Actions */}
           <div className="flex items-center justify-end gap-1 sm:gap-3 flex-1">
+            {/* Currency Selector */}
+            <CurrencySelector iconColor={iconColor} />
+
             {/* Search button */}
             <button
               onClick={() => setSearchOpen(v => !v)}

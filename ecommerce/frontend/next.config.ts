@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   compress: true,
   images: {
+    dangerouslyAllowLocalIP: true,
     remotePatterns: [
       // Allow images from the live Hostinger backend
       { protocol: 'https', hostname: 'api.haraceylon.com', pathname: '/**' },

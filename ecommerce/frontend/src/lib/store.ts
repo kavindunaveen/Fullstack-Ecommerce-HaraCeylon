@@ -74,21 +74,21 @@ export const useCartStore = create<CartState>()((set) => ({
 interface CurrencyState {
   currency: string; symbol: string; rate: number;
   setCurrency: (code: string, symbol: string, rate: number) => void;
-  formatPrice: (gbpPrice: number) => string;
+  formatPrice: (basePrice: number) => string;
 }
 
 export const useCurrencyStore = create<CurrencyState>()(
   persist(
     (set, get) => ({
-      currency: 'GBP', symbol: '£', rate: 1,
+      currency: 'USD', symbol: '$', rate: 1,
       setCurrency: (code, symbol, rate) => {
         if (typeof window !== 'undefined') localStorage.setItem('currency', code);
         set({ currency: code, symbol, rate });
       },
-      formatPrice: (gbpPrice) => {
+      formatPrice: (basePrice) => {
         const { symbol, rate } = get();
-        const converted = Math.round(gbpPrice * rate * 100) / 100;
-        return `${symbol}${converted.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const converted = Math.round(basePrice * rate * 100) / 100;
+        return `${symbol}${converted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       },
     }),
     { name: 'hara-currency' }

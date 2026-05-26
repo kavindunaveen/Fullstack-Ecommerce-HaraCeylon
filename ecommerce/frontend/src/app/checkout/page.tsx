@@ -20,7 +20,7 @@ import toast from 'react-hot-toast';
 import { ShieldCheck, Truck, Lock, Tag, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
 import type { CartItem } from '@/lib/store';
 import AddressFields from '@/components/checkout/AddressFields';
-
+import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
 
 
 interface ShippingRate {
@@ -57,9 +57,8 @@ export default function CheckoutPage() {
     shipping_postal_code: '',
     shipping_country: 'GB',
 
-    // Order
     shipping_rate_id: '',
-    payment_method: 'cod',  // Default: Cash on Delivery
+    payment_method: 'paypal',  // Default: PayPal
     coupon_code: '',
     customer_note: '',
     terms_accepted: false,
@@ -504,31 +503,15 @@ export default function CheckoutPage() {
                 <ShieldCheck size={18} className="text-brand-gold" /> Payment Method
               </h2>
               <div className="space-y-3">
-                {/* Cash on Delivery */}
-                <label className={`flex items-center justify-between p-4 border rounded-xl cursor-pointer transition-all ${form.payment_method === 'cod' ? 'border-brand-gold bg-brand-gold/5' : 'border-gray-200 hover:border-gray-300'}`}>
+                <label className="flex items-center justify-between p-4 border rounded-xl cursor-pointer transition-all border-brand-gold bg-brand-gold/5">
                   <div className="flex items-center gap-3">
-                    <input type="radio" name="payment_method" value="cod" checked={form.payment_method === 'cod'} onChange={handleChange} className="accent-brand-gold" />
+                    <input type="radio" name="payment_method" value="paypal" readOnly checked className="accent-brand-gold" />
                     <div>
-                      <p className="font-bold text-sm">Cash on Delivery</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Pay when you receive your order</p>
+                      <p className="font-bold text-sm">PayPal Checkout</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Pay securely via PayPal, Credit or Debit Card</p>
                     </div>
                   </div>
-                  <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-1 rounded-full">Available</span>
-                </label>
-
-                {/* PayHere — show but mark as coming soon */}
-                <label className={`flex items-center justify-between p-4 border rounded-xl cursor-pointer transition-all ${form.payment_method === 'payhere' ? 'border-brand-gold bg-brand-gold/5' : 'border-gray-200 hover:border-gray-300'}`}>
-                  <div className="flex items-center gap-3">
-                    <input type="radio" name="payment_method" value="payhere" checked={form.payment_method === 'payhere'} onChange={handleChange} className="accent-brand-gold" />
-                    <div>
-                      <p className="font-bold text-sm">Pay Securely Online</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Visa, MasterCard, Amex via PayHere</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-1 items-center">
-                    <span className="text-[10px] font-bold border border-gray-200 px-1.5 py-0.5 rounded text-gray-400">VISA</span>
-                    <span className="text-[10px] font-bold border border-gray-200 px-1.5 py-0.5 rounded text-gray-400">MC</span>
-                  </div>
+                  <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded-full">Secure</span>
                 </label>
               </div>
             </div>
@@ -669,18 +652,51 @@ export default function CheckoutPage() {
                 </span>
               </label>
 
-              {/* Place Order Button */}
-              <button
-                type="submit"
-                disabled={placingOrder || !form.shipping_rate_id || !form.terms_accepted}
-                className="w-full bg-brand-dark text-white py-4 rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-brand-gold transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {placingOrder
-                  ? 'Processing…'
-                  : form.payment_method === 'cod'
-                  ? 'Place Order'
-                  : 'Continue to Payment'}
-              </button>
+              {/* Place Order Button or PayPal */}
+              {!form.shipping_rate_id || !form.terms_accepted ? (
+                <button
+                  type="submit"
+                  disabled={true}
+                  className="w-full bg-brand-dark text-white py-4 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Complete Form to Pay
+                </button>
+              ) : placingOrder ? (
+                <button disabled className="w-full bg-brand-dark text-white py-4 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl opacity-50">
+                  Processing…
+                </button>
+              ) : (
+                <PayPalScriptProvider options={{ clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "test", currency: currency }}>
+                  <PayPalButtons
+                    style={{ layout: "vertical" }}
+                    createOrder={(data, actions) => {
+                      return actions.order.create({
+                        intent: "CAPTURE",
+                        purchase_units: [
+                          {
+                            amount: {
+                              currency_code: currency,
+                              value: (grandTotal).toFixed(2),
+                            },
+                          },
+                        ],
+                      });
+                    }}
+                    onApprove={async (data, actions) => {
+                      if (!actions.order) return;
+                      const details = await actions.order.capture();
+                      // Only proceed with placing the order on our backend if PayPal capture was successful
+                      if (details.status === 'COMPLETED') {
+                         await handleSubmit(new Event('submit') as unknown as React.FormEvent);
+                      }
+                    }}
+                    onError={(err) => {
+                      toast.error("PayPal encountered an error. Please try again.");
+                      console.error("PayPal Checkout Error:", err);
+                    }}
+                  />
+                </PayPalScriptProvider>
+              )}
 
               {/* Trust Badges */}
               <div className="mt-6 flex items-center justify-center gap-6 text-gray-400">

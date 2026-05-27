@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const prisma_1 = __importDefault(require("../prisma"));
 const auth_1 = require("../middleware/auth");
+const utils_1 = require("../utils");
 const router = (0, express_1.Router)();
 // ── User Profile ─────────────────────────────────────────────
 router.get('/user/', auth_1.authenticate, async (req, res) => {
@@ -173,8 +174,8 @@ router.get('/orders/', auth_1.authenticate, async (req, res) => {
             created_at: order.createdAt,
             grand_total: order.totalAmount,
             items: order.items.map(item => ({
-                product_name_snapshot: item.product.name,
-                image_url_snapshot: item.product.images.find(i => i.isMain)?.imageUrl || item.product.images[0]?.imageUrl || null,
+                product_name_snapshot: item.product?.name || 'Unknown Product',
+                image_url_snapshot: (0, utils_1.toAbsoluteUrl)(item.product?.images?.find(i => i.isMain)?.imageUrl || item.product?.images?.[0]?.imageUrl || null),
                 quantity: item.quantity,
                 price: item.price,
             })),
@@ -213,8 +214,8 @@ router.get('/orders/:orderNumber/', auth_1.authenticate, async (req, res) => {
             customer_note: order.customerNote,
             items: order.items.map((item) => ({
                 id: item.id,
-                product_name_snapshot: item.product.name,
-                image_url_snapshot: item.product.images.find((i) => i.isMain)?.imageUrl || item.product.images[0]?.imageUrl || null,
+                product_name_snapshot: item.product?.name || 'Unknown Product',
+                image_url_snapshot: (0, utils_1.toAbsoluteUrl)(item.product?.images?.find((i) => i.isMain)?.imageUrl || item.product?.images?.[0]?.imageUrl || null),
                 quantity: item.quantity,
                 unit_price: item.price,
                 total_price: item.price * item.quantity,

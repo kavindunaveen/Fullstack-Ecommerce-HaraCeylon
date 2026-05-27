@@ -60,15 +60,75 @@ interface CartState {
   cart: Cart | null; isCartOpen: boolean;
   setCart: (cart: Cart) => void;
   openCart: () => void; closeCart: () => void; toggleCart: () => void;
+  // Optimistic: instantly bump item_count & subtotal before API responds
+  optimisticAdd: (product: CartItem['product'], quantity: number) => Cart | null;
+  // Revert if API call failed
+  revertCart: (previousCart: Cart | null) => void;
 }
 
-export const useCartStore = create<CartState>()((set) => ({
+export const useCartStore = create<CartState>()((set, get) => ({
   cart: null, isCartOpen: false,
   setCart: (cart) => set({ cart }),
   openCart: () => set({ isCartOpen: true }),
   closeCart: () => set({ isCartOpen: false }),
   toggleCart: () => set((s) => ({ isCartOpen: !s.isCartOpen })),
+
+  optimisticAdd: (product, quantity) => {
+    const previous = get().cart;
+    const price = product.effective_price ?? product.price ?? 0;
+
+    set((s) => {
+      const current = s.cart;
+      if (!current) {
+        // No cart yet — create a minimal one so the badge shows
+        return {
+          isCartOpen: true,
+          cart: {
+            id: 'optimistic',
+            currency: 'USD',
+            item_count: quantity,
+            subtotal: price * quantity,
+            items: [],
+          },
+        };
+      }
+
+      // Check if product already in cart
+      const existing = current.items.find((i) => i.product?.id === product.id);
+      const updatedItems = existing
+        ? current.items.map((i) =>
+            i.product?.id === product.id
+              ? { ...i, quantity: i.quantity + quantity, line_total: i.unit_price * (i.quantity + quantity) }
+              : i
+          )
+        : [
+            ...current.items,
+            {
+              id: `optimistic-${Date.now()}`,
+              product,
+              quantity,
+              unit_price: price,
+              line_total: price * quantity,
+            },
+          ];
+
+      return {
+        isCartOpen: true,
+        cart: {
+          ...current,
+          items: updatedItems,
+          item_count: current.item_count + quantity,
+          subtotal: current.subtotal + price * quantity,
+        },
+      };
+    });
+
+    return previous;
+  },
+
+  revertCart: (previousCart) => set({ cart: previousCart }),
 }));
+
 
 // ── Currency Store ────────────────────────────────────────────
 interface CurrencyState {

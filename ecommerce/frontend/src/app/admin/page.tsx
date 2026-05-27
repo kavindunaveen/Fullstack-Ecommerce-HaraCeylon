@@ -36,17 +36,18 @@ export default function AdminDashboard() {
   useEffect(() => {
     api.get('/admin/stats')
       .then(res => {
-        const { stats: s, recentOrders } = res.data;
+        const { stats: s, recentOrders, lowStockProducts } = res.data;
         setStats({
           total_revenue: s.totalRevenue,
-          today_revenue: 0, // Mocked for now, backend could provide
+          today_revenue: s.todayRevenue,
           active_orders: s.totalOrders,
           total_customers: s.totalCustomers,
-          low_stock_items: 0,
+          low_stock_items: s.lowStockItems,
           total_orders: s.totalOrders,
-          today_orders: 0,
-          new_customers_today: 0,
+          today_orders: s.todayOrders,
+          new_customers_today: s.newCustomersToday,
           pending_orders: recentOrders.filter((o: any) => o.status === 'pending').length,
+          low_stock_products: lowStockProducts,
           recent_orders: recentOrders.map((o: any) => ({
             order_number: o.id,
             customer_name: o.customer,

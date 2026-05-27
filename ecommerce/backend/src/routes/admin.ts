@@ -100,21 +100,45 @@ router.post('/login', async (req, res): Promise<any> => {
 // Admin Dashboard Stats
 router.get('/stats', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
   try {
+    const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
+    
     // Run all queries in parallel for maximum speed
-    const [totalOrders, activeProducts, totalCustomers, revenueAgg, recentOrders] = await Promise.all([
+    const [
+      totalOrders, 
+      activeProducts, 
+      totalCustomers, 
+      revenueAgg, 
+      recentOrders,
+      todayOrders,
+      newCustomersToday,
+      todayRevenueAgg,
+      lowStockProducts
+    ] = await Promise.all([
       prisma.order.count(),
       prisma.product.count(),
       prisma.user.count({ where: { role: 'CUSTOMER' } }),
-      // Use aggregate SUM instead of fetching all order records
       prisma.order.aggregate({ _sum: { totalAmount: true } }),
       prisma.order.findMany({
         take: 10,
         orderBy: { createdAt: 'desc' },
         include: { user: { select: { firstName: true, lastName: true } } }
       }),
+      prisma.order.count({ where: { createdAt: { gte: todayStart } } }),
+      prisma.user.count({ where: { role: 'CUSTOMER', createdAt: { gte: todayStart } } }),
+      prisma.order.aggregate({
+        where: { createdAt: { gte: todayStart } },
+        _sum: { totalAmount: true }
+      }),
+      prisma.product.findMany({
+        where: { stock: { lte: 10 } },
+        select: { id: true, name: true, stock: true },
+        take: 5,
+        orderBy: { stock: 'asc' }
+      })
     ]);
 
     const totalRevenue = revenueAgg._sum.totalAmount ?? 0;
+    const todayRevenue = todayRevenueAgg._sum.totalAmount ?? 0;
 
     const formattedRecentOrders = recentOrders.map(order => ({
       id: order.orderNumber,
@@ -126,8 +150,18 @@ router.get('/stats', authenticate, requireAdmin, async (req: AuthRequest, res): 
     }));
 
     res.json({
-      stats: { totalRevenue, totalOrders, activeProducts, totalCustomers },
-      recentOrders: formattedRecentOrders
+      stats: { 
+        totalRevenue, 
+        todayRevenue,
+        totalOrders, 
+        todayOrders,
+        activeProducts, 
+        totalCustomers,
+        newCustomersToday,
+        lowStockItems: lowStockProducts.length
+      },
+      recentOrders: formattedRecentOrders,
+      lowStockProducts
     });
   } catch (error) {
     console.error(error);
@@ -249,6 +283,42 @@ router.put('/products/:id', authenticate, requireAdmin, async (req: AuthRequest,
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to update product' });
+  }
+});
+
+// Admin Export Orders to CSV
+router.get('/orders/export', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const orders = await prisma.order.findMany({
+      include: {
+        user: { select: { firstName: true, lastName: true, email: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const headers = ['Order Number', 'Date', 'Customer Name', 'Customer Email', 'Status', 'Total', 'Currency', 'Payment Method'];
+    const rows = orders.map(order => [
+      order.orderNumber,
+      order.createdAt.toISOString(),
+      order.user ? `${order.user.firstName} ${order.user.lastName}` : order.shippingName,
+      order.user?.email || '',
+      order.status,
+      order.totalAmount,
+      order.currency,
+      order.paymentMethod
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    res.header('Content-Type', 'text/csv');
+    res.attachment(`orders_export_${new Date().toISOString().split('T')[0]}.csv`);
+    return res.send(csvContent);
+  } catch (error) {
+    console.error('Export error:', error);
+    res.status(500).json({ error: 'Failed to export orders' });
   }
 });
 

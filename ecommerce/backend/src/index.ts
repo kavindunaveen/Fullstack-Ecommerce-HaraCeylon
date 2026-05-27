@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import morgan from 'morgan';
 import compression from 'compression';
 import prisma from './prisma';
+import { authenticate } from './middleware/auth';
 
 dotenv.config();
 
@@ -110,6 +111,13 @@ const formatProduct = (p: any, detail = false) => {
     base.stock = p.stock;
     base.stock_status = p.stock > 0 ? 'in_stock' : 'out_of_stock';
     base.images = (p.images || []).map(formatImg);
+    base.reviews = (p.reviews || []).map((r: any) => ({
+      id: r.id,
+      rating: r.rating,
+      comment: r.comment,
+      user_name: r.user ? `${r.user.firstName} ${r.user.lastName}` : 'Guest',
+      created_at: r.createdAt
+    }));
   }
   return base;
 };
@@ -232,7 +240,11 @@ app.get('/api/products/:slug', async (req, res): Promise<any> => {
     const slug = req.params.slug as string;
     const product = await prisma.product.findUnique({
       where: { slug },
-      include: { category: true, images: true }
+      include: { 
+        category: true, 
+        images: true,
+        reviews: { include: { user: true }, orderBy: { createdAt: 'desc' } }
+      }
     });
     if (!product) return res.status(404).json({ error: 'Product not found' });
     setProductCache(res);
@@ -240,6 +252,51 @@ app.get('/api/products/:slug', async (req, res): Promise<any> => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed' });
+  }
+});
+
+// Submit Product Review
+app.post('/api/products/:slug/reviews', authenticate, async (req: any, res: any): Promise<any> => {
+  try {
+    const slug = req.params.slug as string;
+    const { rating, comment } = req.body;
+    const userId = req.user.id;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Valid rating (1-5) is required' });
+    }
+
+    const product = await prisma.product.findUnique({ where: { slug } });
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    // Ensure user hasn't already reviewed
+    const existing = await prisma.review.findFirst({
+      where: { productId: product.id, userId }
+    });
+    if (existing) {
+      return res.status(400).json({ error: 'You have already reviewed this product' });
+    }
+
+    const review = await prisma.review.create({
+      data: {
+        rating: Number(rating),
+        comment,
+        userId,
+        productId: product.id
+      },
+      include: { user: true }
+    });
+
+    res.json({
+      id: review.id,
+      rating: review.rating,
+      comment: review.comment,
+      user_name: `${review.user.firstName} ${review.user.lastName}`,
+      created_at: review.createdAt
+    });
+  } catch (error) {
+    console.error('Failed to submit review:', error);
+    res.status(500).json({ error: 'Failed to submit review' });
   }
 });
 

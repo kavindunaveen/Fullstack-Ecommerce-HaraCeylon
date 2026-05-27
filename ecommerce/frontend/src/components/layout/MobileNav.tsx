@@ -16,9 +16,10 @@ export default function MobileNav() {
     { href: '/account', icon: User, label: 'Account' },
   ];
 
-  // Hide the bottom nav on product detail pages — the sticky action bar replaces it
+  // Hide the bottom nav on product detail pages (sticky action bar replaces it) and checkout page
   const isProductDetail = pathname.startsWith('/products/') && pathname !== '/products/';
-  if (isProductDetail) return null;
+  const isCheckout = pathname.startsWith('/checkout');
+  if (isProductDetail || isCheckout) return null;
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 z-[90]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
@@ -32,7 +33,7 @@ export default function MobileNav() {
             </Link>
           );
         })}
-        <button onClick={toggleCart} className="flex flex-col items-center gap-1 text-gray-400 hover:text-gray-600 transition-colors">
+        <button onClick={toggleCart} aria-label="Shopping bag" className="flex flex-col items-center gap-1 text-gray-400 hover:text-gray-600 transition-colors">
           <div className="relative">
             <ShoppingBag size={20} strokeWidth={1.5} />
             {items > 0 && (

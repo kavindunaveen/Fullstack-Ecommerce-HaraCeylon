@@ -27,6 +27,23 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title: `${product.name} - HARA Ceylon`,
     description: product.short_description || product.description,
     openGraph: {
+      title: `${product.name} - HARA Ceylon`,
+      description: product.short_description || product.description,
+      type: 'website',
+      url: `https://haraceylon.com/products/${product.slug}`,
+      images: mainImage ? [
+        {
+          url: mainImage.image_url,
+          width: 800,
+          height: 800,
+          alt: product.name,
+        }
+      ] : [],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${product.name} - HARA Ceylon`,
+      description: product.short_description || product.description,
       images: mainImage ? [mainImage.image_url] : [],
     },
   };

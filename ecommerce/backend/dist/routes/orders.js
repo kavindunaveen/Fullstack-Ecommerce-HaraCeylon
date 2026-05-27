@@ -7,11 +7,13 @@ const express_1 = require("express");
 const prisma_1 = __importDefault(require("../prisma"));
 const auth_1 = require("../middleware/auth");
 const shipping_1 = require("./shipping");
+const utils_1 = require("../utils");
+const email_1 = require("../utils/email");
 const router = (0, express_1.Router)();
 // Checkout
 router.post('/checkout/', auth_1.optionalAuthenticate, async (req, res) => {
     try {
-        const { billing_full_name, billing_email, billing_phone, billing_address_line_1, billing_address_line_2, billing_city, billing_country, billing_postal_code, shipping_full_name, shipping_address_line_1, shipping_address_line_2, shipping_city, shipping_country, shipping_postal_code, ship_to_different_address, currency = 'GBP', shipping_rate_id, customer_note, payment_method } = req.body;
+        const { billing_full_name, billing_email, billing_phone, billing_address_line_1, billing_address_line_2, billing_city, billing_country, billing_postal_code, billing_state, shipping_full_name, shipping_address_line_1, shipping_address_line_2, shipping_city, shipping_country, shipping_postal_code, ship_to_different_address, currency, shipping_rate_id, customer_note, payment_method, save_address } = req.body;
         const sessionId = req.headers['x-session-id'];
         let cart;
         let checkoutUserId = req.user?.id || null;
@@ -42,6 +44,9 @@ router.post('/checkout/', auth_1.optionalAuthenticate, async (req, res) => {
         }
         if (!cart || cart.items.length === 0) {
             return res.status(400).json({ error: 'Cart is empty' });
+        }
+        if (!currency) {
+            return res.status(400).json({ error: 'Currency is required' });
         }
         // Validate stock before proceeding
         for (const item of cart.items) {
@@ -74,38 +79,83 @@ router.post('/checkout/', auth_1.optionalAuthenticate, async (req, res) => {
         const subtotal = cart.items.reduce((acc, item) => acc + (item.product.effectivePrice * item.quantity), 0);
         const totalAmount = subtotal + shippingPrice;
         const orderNumber = `HARA-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
-        const order = await prisma_1.default.order.create({
-            data: {
-                orderNumber,
-                userId: checkoutUserId,
-                totalAmount,
-                currency,
-                shippingName: sName,
-                shippingAddress: sAddr,
-                shippingCity: sCity,
-                shippingCountry: sCountry,
-                shippingZip: sZip,
-                paymentMethod: payment_method || 'cod',
-                paymentStatus: 'pending',
-                customerNote: customer_note || null,
-                items: {
-                    create: cart.items.map(item => ({
-                        productId: item.productId,
-                        quantity: item.quantity,
-                        price: item.product.effectivePrice
-                    }))
+        const order = await prisma_1.default.$transaction(async (tx) => {
+            const newOrder = await tx.order.create({
+                data: {
+                    orderNumber,
+                    userId: checkoutUserId,
+                    totalAmount,
+                    currency,
+                    shippingName: sName,
+                    shippingAddress: sAddr,
+                    shippingCity: sCity,
+                    shippingCountry: sCountry,
+                    shippingZip: sZip,
+                    paymentMethod: payment_method || 'cod',
+                    paymentStatus: 'pending',
+                    customerNote: customer_note || null,
+                    items: {
+                        create: cart.items.map((item) => ({
+                            productId: item.productId,
+                            quantity: item.quantity,
+                            price: item.product.effectivePrice
+                        }))
+                    }
                 }
-            }
-        });
-        // Decrement stock for each item
-        for (const item of cart.items) {
-            await prisma_1.default.product.update({
-                where: { id: item.productId },
-                data: { stock: { decrement: item.quantity } }
             });
+            // Decrement stock for each item
+            for (const item of cart.items) {
+                await tx.product.update({
+                    where: { id: item.productId },
+                    data: { stock: { decrement: item.quantity } }
+                });
+            }
+            // Clear cart
+            await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+            return newOrder;
+        });
+        // Save address to user profile if requested
+        if (checkoutUserId && save_address) {
+            const [firstName, ...lastNameParts] = (billing_full_name || '').split(' ');
+            const lastName = lastNameParts.join(' ');
+            const addressData = {
+                userId: checkoutUserId,
+                firstName: firstName || 'Customer',
+                lastName: lastName || '',
+                street: billing_address_line_1,
+                city: billing_city,
+                state: billing_state || null,
+                zipCode: billing_postal_code,
+                country: billing_country,
+                phone: billing_phone,
+            };
+            // Check if user already has this address
+            const existingAddress = await prisma_1.default.address.findFirst({
+                where: {
+                    userId: checkoutUserId,
+                    street: billing_address_line_1,
+                    zipCode: billing_postal_code,
+                    city: billing_city
+                }
+            });
+            if (!existingAddress) {
+                // If it's their first address, make it default
+                const addressCount = await prisma_1.default.address.count({ where: { userId: checkoutUserId } });
+                await prisma_1.default.address.create({
+                    data: {
+                        ...addressData,
+                        isDefault: addressCount === 0
+                    }
+                });
+            }
         }
-        // Clear cart
-        await prisma_1.default.cartItem.deleteMany({ where: { cartId: cart.id } });
+        // Send confirmation email asynchronously (do not block the response)
+        const emailItems = cart.items.map((item) => ({
+            name: item.product.name,
+            quantity: item.quantity,
+            price: item.product.effectivePrice,
+        }));
+        (0, email_1.sendOrderConfirmationEmail)(billing_email, billing_full_name, order.orderNumber, totalAmount, currency, emailItems).catch(err => console.error('Failed to send order email in background:', err));
         res.status(201).json({
             order_number: order.orderNumber,
             message: 'Order placed successfully'
@@ -143,8 +193,8 @@ router.get('/:orderNumber/', auth_1.optionalAuthenticate, async (req, res) => {
             currency: order.currency,
             items: order.items.map(item => ({
                 id: item.id,
-                product_name_snapshot: item.product.name,
-                image_url_snapshot: item.product.images.find(i => i.isMain)?.imageUrl || item.product.images[0]?.imageUrl || null,
+                product_name_snapshot: item.product?.name || 'Unknown Product',
+                image_url_snapshot: (0, utils_1.toAbsoluteUrl)(item.product?.images?.find(i => i.isMain)?.imageUrl || item.product?.images?.[0]?.imageUrl || null),
                 quantity: item.quantity,
                 unit_price: item.price,
                 total_price: item.price * item.quantity

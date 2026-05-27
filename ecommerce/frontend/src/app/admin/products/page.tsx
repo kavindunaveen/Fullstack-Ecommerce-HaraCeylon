@@ -89,9 +89,9 @@ export default function AdminProducts() {
                   <td className="p-4">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 bg-gray-50 rounded-lg overflow-hidden border border-gray-100 flex items-center justify-center p-1">
-                        {p.imageUrl || p.images?.[0]?.imageUrl ? (
+                        {p.imageUrl ? (
                           <Image 
-                            src={p.imageUrl || (p.images[0].imageUrl.startsWith('http') ? p.images[0].imageUrl : (p.images[0].imageUrl.startsWith('/uploads') ? `${BACKEND_URL}${p.images[0].imageUrl}` : p.images[0].imageUrl))} 
+                            src={p.imageUrl} 
                             alt="" 
                             width={48}
                             height={48}

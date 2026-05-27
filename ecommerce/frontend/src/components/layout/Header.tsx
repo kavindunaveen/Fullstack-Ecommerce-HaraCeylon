@@ -176,6 +176,7 @@ export default function Header() {
               <button
                 onMouseEnter={() => !mobileOpen && setAccountOpen(true)}
                 onClick={() => setAccountOpen(v => !v)}
+                aria-label="Account menu"
                 className={`p-1.5 transition-colors hover:text-brand-gold flex items-center gap-1 ${iconColor} ${accountOpen ? 'text-brand-gold' : ''}`}
               >
                 <User strokeWidth={1.5} size={19} />
@@ -325,6 +326,7 @@ export default function Header() {
                     <button
                       type="button"
                       onClick={() => setSearchQuery('')}
+                      aria-label="Clear search"
                       className="absolute right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-100 rounded-full text-gray-400"
                     >
                       {searchLoading ? <Loader2 className="animate-spin" size={16} /> : <X size={16} />}

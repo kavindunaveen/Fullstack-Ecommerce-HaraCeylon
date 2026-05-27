@@ -2,9 +2,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { cartApi } from '@/lib/api';
-import { ShoppingBag, Heart, ChevronRight, ShieldCheck, Truck, CheckCircle2, Star, Minus, Plus } from 'lucide-react';
-import { useCartStore, useWishlistStore, useCurrencyStore } from '@/lib/store';
+import api, { cartApi } from '@/lib/api';
+import { ShoppingBag, Heart, ChevronRight, ShieldCheck, Truck, CheckCircle2, Star, Minus, Plus, UserCircle } from 'lucide-react';
+import { useCartStore, useWishlistStore, useCurrencyStore, useAuthStore } from '@/lib/store';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -24,17 +24,26 @@ interface Product {
   stock_quantity: number;
   stock_status: string;
   images: { image_url: string; alt_text: string; is_main: boolean }[];
+  reviews?: { id: string; rating: number; comment: string; user_name: string; created_at: string }[];
 }
 
 export default function ProductDetailClient({ product, allImages }: { product: Product; allImages: any[] }) {
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState<string>('');
   const [adding, setAdding] = useState(false);
+  
+  // Reviews state
+  const [reviews, setReviews] = useState(product.reviews || []);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+
   const router = useRouter();
 
-  const { setCart, openCart } = useCartStore();
+  const { setCart, optimisticAdd, revertCart } = useCartStore();
   const { hasItem, addItem: addWishlist, removeItem: removeWishlist } = useWishlistStore();
   const { formatPrice } = useCurrencyStore();
+  const { user } = useAuthStore();
 
   const isWishlisted = hasItem(product.id);
   const inStock = product.stock_quantity > 0;
@@ -49,12 +58,14 @@ export default function ProductDetailClient({ product, allImages }: { product: P
   const handleAddToCart = async () => {
     if (adding) return;
     setAdding(true);
-    openCart();
+    // ⚡ Instantly open cart, update count and subtotal — no network wait
+    const previousCart = optimisticAdd(product as any, quantity);
     toast.success('Added to bag');
     try {
       const res = await cartApi.add({ product_id: product.id, quantity });
-      setCart(res.data);
+      setCart(res.data); // Replace with confirmed server data
     } catch {
+      revertCart(previousCart); // Rollback on failure
       toast.error('Could not add to bag');
     } finally {
       setAdding(false);
@@ -83,6 +94,33 @@ export default function ProductDetailClient({ product, allImages }: { product: P
       toast.success('Added to wishlist');
     }
   };
+
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) {
+      toast.error('You must be logged in to leave a review.');
+      return;
+    }
+    setSubmittingReview(true);
+    try {
+      const res = await api.post(`/products/${product.slug}/reviews`, {
+        rating: reviewRating,
+        comment: reviewComment
+      });
+      setReviews([res.data, ...reviews]);
+      setReviewComment('');
+      setReviewRating(5);
+      toast.success('Review submitted successfully!');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to submit review');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  const avgRating = reviews.length > 0 
+    ? (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1) 
+    : '0.0';
 
   return (
     <>
@@ -122,6 +160,7 @@ export default function ProductDetailClient({ product, allImages }: { product: P
                 {/* Wishlist on image */}
                 <button
                   onClick={toggleWishlist}
+                  aria-label="Toggle wishlist"
                   className={`absolute top-4 right-4 z-10 w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ${
                     isWishlisted
                       ? 'bg-red-500 text-white shadow-red-200'
@@ -160,6 +199,7 @@ export default function ProductDetailClient({ product, allImages }: { product: P
                       <button
                         key={idx}
                         onClick={() => setActiveImage(img.image_url)}
+                        aria-label={`View image ${idx + 1}`}
                         className={`shrink-0 w-14 h-14 md:w-16 md:h-16 rounded-xl bg-white border-2 overflow-hidden transition-all duration-200 ${
                           activeImage === img.image_url
                             ? 'border-brand-gold shadow-md shadow-brand-gold/20 scale-105'
@@ -187,14 +227,20 @@ export default function ProductDetailClient({ product, allImages }: { product: P
                   <p className="text-[11px] text-gray-400 font-mono mt-1">SKU: {product.sku}</p>
                 </div>
 
-                {/* Rating placeholder */}
+                {/* Rating */}
                 <div className="flex items-center gap-2 mb-4">
                   <div className="flex">
                     {[1,2,3,4,5].map(i => (
-                      <Star key={i} size={13} className="text-brand-gold fill-brand-gold" />
+                      <Star 
+                        key={i} 
+                        size={14} 
+                        className={i <= Math.round(Number(avgRating)) ? "text-brand-gold fill-brand-gold" : "text-gray-200"} 
+                      />
                     ))}
                   </div>
-                  <span className="text-xs text-gray-400 font-medium">5.0 · Verified Product</span>
+                  <span className="text-xs text-gray-400 font-medium">
+                    {avgRating} ({reviews.length} {reviews.length === 1 ? 'Review' : 'Reviews'})
+                  </span>
                 </div>
 
                 {/* Price */}
@@ -245,6 +291,7 @@ export default function ProductDetailClient({ product, allImages }: { product: P
                       <button
                         onClick={() => setQuantity(q => Math.max(1, q - 1))}
                         disabled={!inStock}
+                        aria-label="Decrease quantity"
                         className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-gray-600 hover:text-brand-dark transition-colors font-bold disabled:opacity-40"
                       >
                         <Minus size={16} />
@@ -253,6 +300,7 @@ export default function ProductDetailClient({ product, allImages }: { product: P
                       <button
                         onClick={() => setQuantity(q => q + 1)}
                         disabled={!inStock || quantity >= product.stock_quantity}
+                        aria-label="Increase quantity"
                         className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-gray-600 hover:text-brand-dark transition-colors font-bold disabled:opacity-40"
                       >
                         <Plus size={16} />
@@ -281,6 +329,104 @@ export default function ProductDetailClient({ product, allImages }: { product: P
               </div>
             </div>
           </div>
+
+          {/* ── Reviews Section ── */}
+          <div className="mt-16 bg-white rounded-3xl shadow-sm border border-gray-100 p-6 md:p-10">
+            <h2 className="text-2xl font-serif font-bold text-gray-900 mb-8 border-b border-gray-100 pb-4">Customer Reviews</h2>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+              <div className="lg:col-span-1">
+                <div className="bg-gray-50 rounded-2xl p-6 text-center mb-8">
+                  <span className="text-5xl font-bold text-brand-dark">{avgRating}</span>
+                  <div className="flex justify-center mt-2 mb-2">
+                    {[1,2,3,4,5].map(i => (
+                      <Star key={i} size={16} className={i <= Math.round(Number(avgRating)) ? "text-brand-gold fill-brand-gold" : "text-gray-200"} />
+                    ))}
+                  </div>
+                  <span className="text-sm text-gray-500">Based on {reviews.length} reviews</span>
+                </div>
+
+                {/* Review Form */}
+                {user ? (
+                  <form onSubmit={handleReviewSubmit} className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+                    <h3 className="font-bold mb-4">Write a Review</h3>
+                    <div className="mb-4 flex gap-1 justify-center">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setReviewRating(star)}
+                          aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
+                          className="focus:outline-none transition-transform hover:scale-110"
+                        >
+                          <Star 
+                            size={24} 
+                            className={star <= reviewRating ? "text-brand-gold fill-brand-gold" : "text-gray-200"} 
+                          />
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      required
+                      value={reviewComment}
+                      onChange={(e) => setReviewComment(e.target.value)}
+                      placeholder="Share your experience..."
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl mb-4 text-sm focus:ring-2 focus:ring-brand-gold/20 focus:border-brand-gold transition-all"
+                      rows={4}
+                    />
+                    <button
+                      type="submit"
+                      disabled={submittingReview}
+                      className="w-full bg-brand-dark text-white py-3 rounded-xl font-bold text-sm hover:bg-brand-gold transition-colors disabled:opacity-50"
+                    >
+                      {submittingReview ? 'Submitting...' : 'Submit Review'}
+                    </button>
+                  </form>
+                ) : (
+                  <div className="bg-brand-gold/10 rounded-2xl p-6 text-center border border-brand-gold/20">
+                    <p className="text-brand-dark text-sm mb-4">Please log in to leave a review.</p>
+                    <Link href="/account/login" className="inline-block bg-brand-dark text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-brand-gold transition-colors">
+                      Log In
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              <div className="lg:col-span-2 space-y-6">
+                {reviews.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">No reviews yet. Be the first to review this product!</div>
+                ) : (
+                  reviews.map((review: any) => (
+                    <div key={review.id} className="border-b border-gray-100 pb-6 last:border-0 last:pb-0">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+                          <UserCircle size={24} />
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900 text-sm">{review.user_name}</p>
+                          <div className="flex items-center gap-2">
+                            <div className="flex">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star 
+                                  key={star} 
+                                  size={10} 
+                                  className={star <= review.rating ? "text-brand-gold fill-brand-gold" : "text-gray-200"} 
+                                />
+                              ))}
+                            </div>
+                            <span className="text-[10px] text-gray-400 font-mono">
+                              {new Date(review.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-gray-600 text-sm leading-relaxed">{review.comment}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -298,6 +444,7 @@ export default function ProductDetailClient({ product, allImages }: { product: P
               <button
                 onClick={() => setQuantity(q => Math.max(1, q - 1))}
                 disabled={!inStock}
+                aria-label="Decrease quantity"
                 className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors font-bold disabled:opacity-40"
               >
                 <Minus size={14} />
@@ -306,6 +453,7 @@ export default function ProductDetailClient({ product, allImages }: { product: P
               <button
                 onClick={() => setQuantity(q => q + 1)}
                 disabled={!inStock || quantity >= product.stock_quantity}
+                aria-label="Increase quantity"
                 className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors font-bold disabled:opacity-40"
               >
                 <Plus size={14} />
@@ -322,6 +470,7 @@ export default function ProductDetailClient({ product, allImages }: { product: P
           {/* Wishlist */}
           <button
             onClick={toggleWishlist}
+            aria-label="Toggle wishlist"
             className={`w-12 h-12 shrink-0 rounded-2xl flex items-center justify-center border-2 transition-all ${
               isWishlisted
                 ? 'bg-red-50 border-red-200 text-red-500'

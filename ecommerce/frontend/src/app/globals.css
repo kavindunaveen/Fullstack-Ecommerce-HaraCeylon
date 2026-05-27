@@ -1,6 +1,15 @@
 /* Fonts are loaded via next/font/google in layout.tsx for zero FOUT and render-blocking prevention */
 @import "tailwindcss";
 
+/* ── Explicitly tell Tailwind v4 where to scan for classes ────────────────
+   Without this, Tailwind may miss classes on a cold cache first-load in new
+   browser sessions, causing the "no CSS" flash you observed.
+   ──────────────────────────────────────────────────────────────────────── */
+@source "../app/**/*.{ts,tsx}";
+@source "../components/**/*.{ts,tsx}";
+@source "../lib/**/*.{ts,tsx}";
+
+
 @theme {
   --color-brand-dark: #0A1A12;
   --color-brand-green: #1E4D2B;

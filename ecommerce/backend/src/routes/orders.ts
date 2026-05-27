@@ -3,6 +3,7 @@ import prisma from '../prisma';
 import { authenticate, optionalAuthenticate, AuthRequest } from '../middleware/auth';
 import { DEFAULT_RATES, DOMESTIC_RATES } from './shipping';
 import { toAbsoluteUrl } from '../utils';
+import { sendOrderConfirmationEmail } from '../utils/email';
 
 const router = Router();
 
@@ -26,7 +27,7 @@ router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): P
       shipping_country,
       shipping_postal_code,
       ship_to_different_address,
-      currency = 'GBP',
+      currency,
       shipping_rate_id,
       customer_note,
       payment_method,
@@ -70,6 +71,10 @@ router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): P
       return res.status(400).json({ error: 'Cart is empty' });
     }
 
+    if (!currency) {
+      return res.status(400).json({ error: 'Currency is required' });
+    }
+
     // Validate stock before proceeding
     for (const item of cart.items) {
       if (item.product.stock < item.quantity) {
@@ -106,28 +111,43 @@ router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): P
     const totalAmount = subtotal + shippingPrice;
     const orderNumber = `HARA-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
 
-    const order = await prisma.order.create({
-      data: {
-        orderNumber,
-        userId: checkoutUserId,
-        totalAmount,
-        currency,
-        shippingName: sName,
-        shippingAddress: sAddr,
-        shippingCity: sCity,
-        shippingCountry: sCountry,
-        shippingZip: sZip,
-        paymentMethod: payment_method || 'cod',
-        paymentStatus: 'pending',
-        customerNote: customer_note || null,
-        items: {
-          create: cart.items.map(item => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            price: item.product.effectivePrice
-          }))
+    const order = await prisma.$transaction(async (tx) => {
+      const newOrder = await tx.order.create({
+        data: {
+          orderNumber,
+          userId: checkoutUserId,
+          totalAmount,
+          currency,
+          shippingName: sName,
+          shippingAddress: sAddr,
+          shippingCity: sCity,
+          shippingCountry: sCountry,
+          shippingZip: sZip,
+          paymentMethod: payment_method || 'cod',
+          paymentStatus: 'pending',
+          customerNote: customer_note || null,
+          items: {
+            create: cart.items.map((item: any) => ({
+              productId: item.productId,
+              quantity: item.quantity,
+              price: item.product.effectivePrice
+            }))
+          }
         }
+      });
+
+      // Decrement stock for each item
+      for (const item of cart.items) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.quantity } }
+        });
       }
+
+      // Clear cart
+      await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+
+      return newOrder;
     });
 
     // Save address to user profile if requested
@@ -169,16 +189,20 @@ router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): P
       }
     }
 
-    // Decrement stock for each item
-    for (const item of cart.items) {
-      await prisma.product.update({
-        where: { id: item.productId },
-        data: { stock: { decrement: item.quantity } }
-      });
-    }
-
-    // Clear cart
-    await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
+    // Send confirmation email asynchronously (do not block the response)
+    const emailItems = cart.items.map((item: any) => ({
+      name: item.product.name,
+      quantity: item.quantity,
+      price: item.product.effectivePrice,
+    }));
+    sendOrderConfirmationEmail(
+      billing_email,
+      billing_full_name,
+      order.orderNumber,
+      totalAmount,
+      currency,
+      emailItems
+    ).catch(err => console.error('Failed to send order email in background:', err));
 
     res.status(201).json({ 
       order_number: order.orderNumber, 

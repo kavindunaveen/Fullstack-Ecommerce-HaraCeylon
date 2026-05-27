@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const prisma_1 = __importDefault(require("../prisma"));
+const utils_1 = require("../utils");
 const router = (0, express_1.Router)();
 const auth_1 = require("../middleware/auth");
 const resolveCart = async (req, res, next) => {
@@ -54,27 +55,30 @@ const formatCart = async (cartId) => {
         where: { cartId: cartId },
         include: { product: { include: { images: true } } }
     });
-    const formattedItems = items.map(item => ({
-        id: item.id,
-        product: {
-            id: item.product.id,
-            name: item.product.name,
-            slug: item.product.slug,
-            sku: item.product.id.slice(0, 8),
-            price: item.product.basePrice,
-            sale_price: item.product.basePrice !== item.product.effectivePrice ? item.product.effectivePrice : null,
-            effective_price: item.product.effectivePrice,
-            stock_status: item.product.stock > 0 ? 'in_stock' : 'out_of_stock',
-            main_image: (item.product.images.find(i => i.isMain) || item.product.images[0]) ? {
-                image_url: (item.product.images.find(i => i.isMain) || item.product.images[0]).imageUrl,
-                is_main: (item.product.images.find(i => i.isMain) || item.product.images[0]).isMain,
-                alt_text: item.product.name
-            } : null
-        },
-        quantity: item.quantity,
-        unit_price: item.product.effectivePrice,
-        line_total: item.product.effectivePrice * item.quantity
-    }));
+    const formattedItems = items.map(item => {
+        const mainImg = item.product.images.find(i => i.isMain) || item.product.images[0] || null;
+        return {
+            id: item.id,
+            product: {
+                id: item.product.id,
+                name: item.product.name,
+                slug: item.product.slug,
+                sku: item.product.id.slice(0, 8),
+                price: item.product.basePrice,
+                sale_price: item.product.basePrice !== item.product.effectivePrice ? item.product.effectivePrice : null,
+                effective_price: item.product.effectivePrice,
+                stock_status: item.product.stock > 0 ? 'in_stock' : 'out_of_stock',
+                main_image: mainImg ? {
+                    image_url: (0, utils_1.toAbsoluteUrl)(mainImg.imageUrl),
+                    is_main: mainImg.isMain,
+                    alt_text: item.product.name
+                } : null
+            },
+            quantity: item.quantity,
+            unit_price: item.product.effectivePrice,
+            line_total: item.product.effectivePrice * item.quantity
+        };
+    });
     const subtotal = formattedItems.reduce((acc, item) => acc + item.line_total, 0);
     const itemCount = formattedItems.reduce((acc, item) => acc + item.quantity, 0);
     return {

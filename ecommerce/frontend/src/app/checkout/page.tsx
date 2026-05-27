@@ -209,8 +209,8 @@ export default function CheckoutPage() {
 
       const res = await checkoutApi.placeOrder(payload);
 
-      // Clear cart in store
-      setCart({ id: '', items: [], subtotal: 0, item_count: 0, currency: 'GBP' });
+      // Clear cart in store, but preserve the selected currency
+      setCart({ id: '', items: [], subtotal: 0, item_count: 0, currency });
 
       // Handle payment redirect (PayHere) or go to success page
       if (res.data.payment_url) {
@@ -662,8 +662,8 @@ export default function CheckoutPage() {
                   Complete Form to Pay
                 </button>
               ) : placingOrder ? (
-                <button disabled className="w-full bg-brand-dark text-white py-4 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl opacity-50">
-                  Processing…
+                <button disabled className="w-full bg-brand-dark text-white py-4 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl opacity-50 flex items-center justify-center gap-2">
+                  <div className="spinner w-4 h-4 border-2 border-white/20 border-t-white" /> Processing…
                 </button>
               ) : (
                 <PayPalScriptProvider options={{ clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "test", currency: currency }}>

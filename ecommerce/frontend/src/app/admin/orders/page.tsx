@@ -47,6 +47,22 @@ export default function AdminOrders() {
     }
   };
 
+  const exportCsv = async () => {
+    try {
+      const res = await api.get('/admin/orders/export', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `orders_export_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Export downloaded');
+    } catch {
+      toast.error('Failed to export orders');
+    }
+  };
+
   const filteredOrders = orders.filter(o => 
     o.orderNumber.toLowerCase().includes(search.toLowerCase()) || 
     (o.user?.email || o.shippingName || '').toLowerCase().includes(search.toLowerCase())
@@ -54,9 +70,17 @@ export default function AdminOrders() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-serif font-bold text-gray-900">Orders</h1>
-        <p className="text-gray-500 mt-2">Process and manage your customer transactions.</p>
+      <div className="mb-8 flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-serif font-bold text-gray-900">Orders</h1>
+          <p className="text-gray-500 mt-2">Process and manage your customer transactions.</p>
+        </div>
+        <button
+          onClick={exportCsv}
+          className="px-5 py-2.5 bg-brand-dark text-white rounded-xl font-bold hover:bg-brand-gold transition-colors flex items-center gap-2 text-sm shadow-sm"
+        >
+          <ExternalLink size={16} /> Export to CSV
+        </button>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">

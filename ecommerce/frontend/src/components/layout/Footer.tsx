@@ -63,6 +63,23 @@ export default function Footer() {
           </div>
         </div>
 
+        {/* Developer Credit */}
+        <div className="mt-6 pt-4 border-t border-white/5 flex justify-center">
+          <a
+            href="https://www.facebook.com/websynic"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-gray-600 hover:text-brand-gold transition-colors duration-300 group"
+          >
+            <span className="text-[10px] uppercase tracking-[0.2em] font-medium">Developed by</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 group-hover:text-brand-gold transition-colors">
+              Websynic Digital Solutions
+            </span>
+            <ArrowUpRight size={11} className="opacity-0 group-hover:opacity-100 transition-opacity text-brand-gold" />
+          </a>
+        </div>
+
+
       </div>
     </footer>
   );

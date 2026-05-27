@@ -28,20 +28,23 @@ const itemAnim: Variants = {
 };
 
 export default function HomeClient({ initialProducts }: { initialProducts: Product[] }) {
-  const { setCart, openCart } = useCartStore();
+  const { setCart, optimisticAdd, revertCart } = useCartStore();
   const { formatPrice } = useCurrencyStore();
   const [addingId, setAddingId] = useState<string | null>(null);
 
   const addToCart = async (e: React.MouseEvent, product: Product) => {
     e.preventDefault();
     e.stopPropagation();
+    if (addingId === product.id) return;
     setAddingId(product.id);
-    openCart();
+    // ⚡ Instantly open cart and update counts — no waiting for network
+    const previousCart = optimisticAdd(product as any, 1);
     toast.success('Added to bag');
     try {
       const res = await cartApi.add({ product_id: product.id, quantity: 1 });
-      setCart(res.data);
+      setCart(res.data); // Replace optimistic state with real server data
     } catch {
+      revertCart(previousCart); // Roll back on failure
       toast.error('Could not add to bag');
     } finally {
       setAddingId(null);
@@ -52,10 +55,17 @@ export default function HomeClient({ initialProducts }: { initialProducts: Produ
     <div className="bg-white">
       {/* ── Hero Section ── */}
       <section className="relative h-[100svh] min-h-[580px] flex items-center justify-center overflow-hidden">
+        <Image
+          src="/hero.png"
+          alt="HARA Ceylon Tea Estate"
+          fill
+          priority
+          className="object-cover absolute inset-0 z-0"
+        />
         <video
-          className="absolute inset-0 w-full h-full object-cover"
-          autoPlay muted loop playsInline poster="/hero.png"
-          preload="metadata"
+          className="absolute inset-0 w-full h-full object-cover z-0"
+          autoPlay muted loop playsInline
+          preload="none"
         >
           <source src="/video2.mp4" type="video/mp4" />
         </video>
@@ -120,17 +130,17 @@ export default function HomeClient({ initialProducts }: { initialProducts: Produ
           <div className="grid grid-cols-3 gap-4 md:gap-8 text-center divide-x divide-white/10">
             <div className="flex flex-col items-center gap-2 md:gap-3 px-2 md:px-4">
               <Globe2 size={20} className="text-brand-gold md:w-6 md:h-6" strokeWidth={1.5} />
-              <h3 className="text-white font-serif text-sm md:text-lg">Single Origin</h3>
+              <h2 className="text-white font-serif text-sm md:text-lg">Single Origin</h2>
               <p className="text-gray-400 text-[11px] md:text-sm hidden sm:block">Direct from Sri Lankan estates</p>
             </div>
             <div className="flex flex-col items-center gap-2 md:gap-3 px-2 md:px-4">
               <Leaf size={20} className="text-brand-gold md:w-6 md:h-6" strokeWidth={1.5} />
-              <h3 className="text-white font-serif text-sm md:text-lg">100% Natural</h3>
+              <h2 className="text-white font-serif text-sm md:text-lg">100% Natural</h2>
               <p className="text-gray-400 text-[11px] md:text-sm hidden sm:block">No artificial additives</p>
             </div>
             <div className="flex flex-col items-center gap-2 md:gap-3 px-2 md:px-4">
               <Droplets size={20} className="text-brand-gold md:w-6 md:h-6" strokeWidth={1.5} />
-              <h3 className="text-white font-serif text-sm md:text-lg">Small Batch</h3>
+              <h2 className="text-white font-serif text-sm md:text-lg">Small Batch</h2>
               <p className="text-gray-400 text-[11px] md:text-sm hidden sm:block">Roasted &amp; packed with care</p>
             </div>
           </div>
@@ -283,11 +293,11 @@ export default function HomeClient({ initialProducts }: { initialProducts: Produ
                 <div className="grid grid-cols-2 gap-6 mb-8 md:mb-12">
                   <div className="border-l-2 border-brand-gold/20 pl-5">
                     <p className="text-2xl md:text-3xl font-serif font-bold text-brand-dark mb-1">100%</p>
-                    <p className="text-[10px] md:text-xs text-gray-400 uppercase tracking-widest font-bold">Traceable Source</p>
+                    <p className="text-[10px] md:text-xs text-gray-500 uppercase tracking-widest font-bold">Traceable Source</p>
                   </div>
                   <div className="border-l-2 border-brand-gold/20 pl-5">
                     <p className="text-2xl md:text-3xl font-serif font-bold text-brand-dark mb-1">Fair</p>
-                    <p className="text-[10px] md:text-xs text-gray-400 uppercase tracking-widest font-bold">Trade Partnerships</p>
+                    <p className="text-[10px] md:text-xs text-gray-500 uppercase tracking-widest font-bold">Trade Partnerships</p>
                   </div>
                 </div>
 

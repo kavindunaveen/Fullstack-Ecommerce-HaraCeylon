@@ -1,0 +1,32 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# HARA Ceylon — Hostinger LiteSpeed Cache Control
+# This file sits in the web root and controls how LiteSpeed/Apache
+# caches content BEFORE it reaches the Next.js Node.js process.
+# ──────────────────────────────────────────────────────────────────────────────
+
+# ── DISABLE LiteSpeed Cache for HTML pages ────────────────────────────────────
+# HTML pages must NEVER be served from cache — they reference hashed CSS/JS
+# filenames that change on every deployment. Serving stale HTML = broken styles.
+<FilesMatch "\.(html|htm)$">
+  Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+  Header set Pragma "no-cache"
+  Header set Expires "0"
+</FilesMatch>
+
+# ── Next.js server-rendered pages (no extension) ──────────────────────────────
+<FilesMatch "^[^.]+$">
+  Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+  Header set Pragma "no-cache"
+</FilesMatch>
+
+# ── Static assets: cache forever (they have content-hashed names) ─────────────
+# Next.js names all CSS/JS/fonts with a unique hash: styles.a1b2c3.css
+# So if the content changes, the filename changes — safe to cache permanently.
+<FilesMatch "\.(css|js|woff2|woff|ttf|eot|ico|webp|avif|svg|png|jpg|jpeg|gif)$">
+  Header set Cache-Control "public, max-age=31536000, immutable"
+</FilesMatch>
+
+# ── Disable LiteSpeed Object Cache for this path ──────────────────────────────
+<IfModule LiteSpeed>
+  CacheLookup off
+</IfModule>

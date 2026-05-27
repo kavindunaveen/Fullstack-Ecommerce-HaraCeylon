@@ -41,7 +41,7 @@ export default function ProductsClient({ initialProducts, categories, searchQuer
   const [filter, setFilter] = useState('all');
   const [addingId, setAddingId] = useState<string | null>(null);
 
-  const { setCart, openCart } = useCartStore();
+  const { setCart, optimisticAdd, revertCart, openCart } = useCartStore();
   const { formatPrice } = useCurrencyStore();
 
   const filteredProducts = initialProducts.filter(p => {
@@ -52,13 +52,17 @@ export default function ProductsClient({ initialProducts, categories, searchQuer
   const addToCart = async (e: React.MouseEvent, product: Product) => {
     e.preventDefault();
     e.stopPropagation();
+    if (addingId === product.id) return;
     setAddingId(product.id);
     openCart();
+    // ⚡ Instantly open cart and update counts — no waiting for network
+    const previousCart = optimisticAdd(product as any, 1);
     toast.success('Added to bag');
     try {
       const res = await cartApi.add({ product_id: product.id, quantity: 1 });
       setCart(res.data);
     } catch {
+      revertCart(previousCart);
       toast.error('Could not add to bag');
     } finally {
       setAddingId(null);

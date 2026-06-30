@@ -16,8 +16,8 @@ async function verifyPayPalPayment(orderId: string, expectedAmount: number, expe
     return false;
   }
 
-  const isProd = process.env.NODE_ENV === 'production';
-  const paypalBaseUrl = isProd ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
+  const mode = process.env.PAYPAL_MODE || (process.env.NODE_ENV === 'production' ? 'live' : 'sandbox');
+  const paypalBaseUrl = mode === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
 
   try {
     const authString = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');

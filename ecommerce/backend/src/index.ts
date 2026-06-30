@@ -71,7 +71,7 @@ app.get('/api/health', (req, res) => {
 // TEMPORARY MIGRATION ENDPOINT (for Hostinger)
 // ───────────────────────────────────────────────
 app.get('/api/migrate', (req, res) => {
-  exec('npx prisma db push', (error, stdout, stderr) => {
+  exec('./node_modules/.bin/prisma db push', (error, stdout, stderr) => {
     if (error) {
       console.error(`Migration error: ${error.message}`);
       return res.status(500).json({ error: error.message, stderr });

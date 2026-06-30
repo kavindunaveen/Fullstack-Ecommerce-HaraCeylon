@@ -8,6 +8,7 @@ const cors_1 = __importDefault(require("cors"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const child_process_1 = require("child_process");
 const morgan_1 = __importDefault(require("morgan"));
 const compression_1 = __importDefault(require("compression"));
 const prisma_1 = __importDefault(require("./prisma"));
@@ -60,6 +61,18 @@ const shipping_1 = __importDefault(require("./routes/shipping"));
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'Backend is running correctly.' });
+});
+// ───────────────────────────────────────────────
+// TEMPORARY MIGRATION ENDPOINT (for Hostinger)
+// ───────────────────────────────────────────────
+app.get('/api/migrate', (req, res) => {
+    (0, child_process_1.exec)('npx prisma db push', (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Migration error: ${error.message}`);
+            return res.status(500).json({ error: error.message, stderr });
+        }
+        res.json({ message: 'Migration successful!', stdout });
+    });
 });
 // API Routes
 app.use('/api/auth', auth_2.default);

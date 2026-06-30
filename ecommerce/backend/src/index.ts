@@ -66,6 +66,18 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Backend is running correctly.' });
 });
 
+// DB diagnostic endpoint
+app.get('/api/dbcheck', async (req, res) => {
+  const url = process.env.DATABASE_URL || 'NOT SET';
+  const masked = url.replace(/:([^:@]+)@/, ':****@');
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ db: 'CONNECTED', url: masked });
+  } catch (err: any) {
+    res.status(500).json({ db: 'FAILED', url: masked, error: err.message });
+  }
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/cart', cartRoutes);

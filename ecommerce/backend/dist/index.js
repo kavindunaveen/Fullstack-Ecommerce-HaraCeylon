@@ -61,6 +61,18 @@ const shipping_1 = __importDefault(require("./routes/shipping"));
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'Backend is running correctly.' });
 });
+// DB diagnostic endpoint
+app.get('/api/dbcheck', async (req, res) => {
+    const url = process.env.DATABASE_URL || 'NOT SET';
+    const masked = url.replace(/:([^:@]+)@/, ':****@');
+    try {
+        await prisma_1.default.$queryRaw `SELECT 1`;
+        res.json({ db: 'CONNECTED', url: masked });
+    }
+    catch (err) {
+        res.status(500).json({ db: 'FAILED', url: masked, error: err.message });
+    }
+});
 // API Routes
 app.use('/api/auth', auth_2.default);
 app.use('/api/cart', cart_1.default);

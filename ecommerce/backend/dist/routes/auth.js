@@ -77,7 +77,7 @@ router.post('/google/', authLimiter, async (req, res) => {
     }
     catch (error) {
         console.error('Google auth error:', error);
-        res.status(500).json({ error: 'Google authentication failed' });
+        res.status(500).json({ error: 'Google authentication failed', details: error.message, stack: error.stack });
     }
 });
 // Refresh Token

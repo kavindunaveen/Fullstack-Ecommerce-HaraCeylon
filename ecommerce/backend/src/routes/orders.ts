@@ -7,6 +7,86 @@ import { sendOrderConfirmationEmail } from '../utils/email';
 
 const router = Router();
 
+async function verifyPayPalPayment(orderId: string, expectedAmount: number, expectedCurrency: string): Promise<boolean> {
+  const clientId = process.env.PAYPAL_CLIENT_ID;
+  const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    console.error('PayPal Client ID or Secret is not configured in backend');
+    return false;
+  }
+
+  const isProd = process.env.NODE_ENV === 'production';
+  const paypalBaseUrl = isProd ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
+
+  try {
+    const authString = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    const tokenResponse = await fetch(`${paypalBaseUrl}/v1/oauth2/token`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${authString}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'grant_type=client_credentials',
+    });
+
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      console.error('Failed to get PayPal token:', errorText);
+      return false;
+    }
+
+    const tokenData = await tokenResponse.json() as any;
+    const accessToken = tokenData.access_token;
+
+    const orderResponse = await fetch(`${paypalBaseUrl}/v2/checkout/orders/${orderId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!orderResponse.ok) {
+      const errorText = await orderResponse.text();
+      console.error('Failed to fetch PayPal order details:', errorText);
+      return false;
+    }
+
+    const orderData = await orderResponse.json() as any;
+    const status = orderData.status;
+    const purchaseUnit = orderData.purchase_units?.[0];
+
+    if (!purchaseUnit) {
+      console.error('PayPal order has no purchase units');
+      return false;
+    }
+
+    const amountValue = parseFloat(purchaseUnit.amount.value);
+    const amountCurrency = purchaseUnit.amount.currency_code;
+
+    if (status !== 'COMPLETED' && status !== 'APPROVED') {
+      console.error(`PayPal order status is ${status}, expected COMPLETED or APPROVED`);
+      return false;
+    }
+
+    if (amountCurrency.toUpperCase() !== expectedCurrency.toUpperCase()) {
+      console.error(`PayPal order currency is ${amountCurrency}, expected ${expectedCurrency}`);
+      return false;
+    }
+
+    if (Math.abs(amountValue - expectedAmount) > 0.05) {
+      console.error(`PayPal order amount is ${amountValue}, expected ${expectedAmount}`);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error verifying PayPal payment:', error);
+    return false;
+  }
+}
+
 // Checkout
 router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): Promise<any> => {
   try {
@@ -31,6 +111,7 @@ router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): P
       shipping_rate_id,
       customer_note,
       payment_method,
+      paypal_order_id,
       save_address
     } = req.body;
 
@@ -109,6 +190,17 @@ router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): P
 
     const subtotal = cart.items.reduce((acc, item) => acc + (item.product.effectivePrice * item.quantity), 0);
     const totalAmount = subtotal + shippingPrice;
+
+    if (payment_method === 'paypal') {
+      if (!paypal_order_id) {
+        return res.status(400).json({ error: 'PayPal Order ID is required for PayPal payments' });
+      }
+      const isVerified = await verifyPayPalPayment(paypal_order_id as string, totalAmount, currency);
+      if (!isVerified) {
+        return res.status(400).json({ error: 'PayPal payment verification failed' });
+      }
+    }
+
     const orderNumber = `HARA-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
 
     const order = await prisma.$transaction(async (tx) => {
@@ -124,7 +216,7 @@ router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): P
           shippingCountry: sCountry,
           shippingZip: sZip,
           paymentMethod: payment_method || 'cod',
-          paymentStatus: 'pending',
+          paymentStatus: payment_method === 'paypal' ? 'paid' : 'pending',
           customerNote: customer_note || null,
           items: {
             create: cart.items.map((item: any) => ({

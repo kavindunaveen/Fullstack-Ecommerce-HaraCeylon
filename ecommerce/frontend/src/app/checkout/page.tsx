@@ -157,7 +157,7 @@ export default function CheckoutPage() {
     setForm(f => ({ ...f, [name]: value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, paypalOrderId?: string) => {
     e.preventDefault();
 
     if (!form.terms_accepted) {
@@ -188,6 +188,7 @@ export default function CheckoutPage() {
         ship_to_different_address: form.ship_to_different_address,
         shipping_rate_id: parseInt(form.shipping_rate_id, 10),
         payment_method: form.payment_method,
+        paypal_order_id: paypalOrderId,
         coupon_code: form.coupon_code.trim().toUpperCase(),
         currency,
         customer_note: form.customer_note,
@@ -687,7 +688,7 @@ export default function CheckoutPage() {
                       const details = await actions.order.capture();
                       // Only proceed with placing the order on our backend if PayPal capture was successful
                       if (details.status === 'COMPLETED') {
-                         await handleSubmit(new Event('submit') as unknown as React.FormEvent);
+                         await handleSubmit(new Event('submit') as unknown as React.FormEvent, details.id);
                       }
                     }}
                     onError={(err) => {

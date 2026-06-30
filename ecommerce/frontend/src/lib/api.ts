@@ -11,6 +11,7 @@ const api = axios.create({
   baseURL: API_BASE,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
+  timeout: 15000,
 });
 
 // Inject JWT access token from localStorage on every request

@@ -261,13 +261,15 @@ export default function Header() {
             </div>
 
             {/* Account Icon (mobile only — taps to account page) */}
-            <Link
-              href={isAuthenticated ? '/account' : '/account/login'}
-              className={`touch-target p-1.5 transition-colors hover:text-brand-gold md:hidden ${iconColor}`}
-              aria-label="Account"
-            >
-              <User strokeWidth={1.5} size={19} />
-            </Link>
+            <div className="flex md:hidden">
+              <Link
+                href={isAuthenticated ? '/account' : '/account/login'}
+                className={`touch-target p-1.5 transition-colors hover:text-brand-gold ${iconColor}`}
+                aria-label="Account"
+              >
+                <User strokeWidth={1.5} size={19} />
+              </Link>
+            </div>
 
             {/* Cart */}
             <button

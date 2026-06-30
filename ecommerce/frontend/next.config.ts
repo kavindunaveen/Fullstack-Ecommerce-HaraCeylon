@@ -41,6 +41,7 @@ const nextConfig: NextConfig = {
   },
 
   images: {
+    unoptimized: true,
     dangerouslyAllowLocalIP: true,
     remotePatterns: [
       // Allow images from the live Hostinger backend

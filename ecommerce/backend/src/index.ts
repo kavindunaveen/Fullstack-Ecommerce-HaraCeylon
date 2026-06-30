@@ -3,7 +3,6 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
-import { exec } from 'child_process';
 import morgan from 'morgan';
 import compression from 'compression';
 import prisma from './prisma';
@@ -65,19 +64,6 @@ import shippingRoutes from './routes/shipping';
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Backend is running correctly.' });
-});
-
-// ───────────────────────────────────────────────
-// TEMPORARY MIGRATION ENDPOINT (for Hostinger)
-// ───────────────────────────────────────────────
-app.get('/api/migrate', (req, res) => {
-  exec(`${process.execPath} node_modules/prisma/build/index.js db push`, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`Migration error: ${error.message}`);
-      return res.status(500).json({ error: error.message, stderr });
-    }
-    res.json({ message: 'Migration successful!', stdout });
-  });
 });
 
 // API Routes

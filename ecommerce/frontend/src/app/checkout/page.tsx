@@ -667,7 +667,7 @@ export default function CheckoutPage() {
                   <div className="spinner w-4 h-4 border-2 border-white/20 border-t-white" /> Processing…
                 </button>
               ) : (
-                <PayPalScriptProvider options={{ clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "test", currency: currency }}>
+                <PayPalScriptProvider key={`${currency}-${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}`} options={{ clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "test", currency: currency }}>
                   <PayPalButtons
                     style={{ layout: "vertical" }}
                     createOrder={(data, actions) => {
@@ -681,18 +681,25 @@ export default function CheckoutPage() {
                             },
                           },
                         ],
+                      }).catch((err) => {
+                        toast.error("PayPal Error: Your PayPal account may be restricted or not fully set up.");
+                        console.error("Create Order Error:", err);
+                        throw err;
                       });
                     }}
                     onApprove={async (data, actions) => {
                       if (!actions.order) return;
-                      const details = await actions.order.capture();
-                      // Only proceed with placing the order on our backend if PayPal capture was successful
-                      if (details.status === 'COMPLETED') {
-                         await handleSubmit(new Event('submit') as unknown as React.FormEvent, details.id);
+                      try {
+                        const details = await actions.order.capture();
+                        if (details.status === 'COMPLETED') {
+                           await handleSubmit(new Event('submit') as unknown as React.FormEvent, details.id);
+                        }
+                      } catch (err) {
+                        toast.error("Payment failed to capture. Please try again.");
+                        console.error("Capture Error:", err);
                       }
                     }}
-                    onError={(err) => {
-                      toast.error("PayPal encountered an error. Please try again.");
+                    onError={(err: any) => {
                       console.error("PayPal Checkout Error:", err);
                     }}
                   />

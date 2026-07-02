@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import Sidebar from '@/components/Sidebar';
 import { Eye, Package, X, ChevronRight } from 'lucide-react';
 
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://api.haraceylon.com/api';
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);

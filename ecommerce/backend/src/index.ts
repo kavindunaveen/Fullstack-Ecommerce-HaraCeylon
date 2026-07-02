@@ -234,9 +234,11 @@ app.get('/api/products/best-sellers/', bestSellersHandler);
 // Categories (accept both /categories and /categories/)
 const categoriesHandler = async (req: any, res: any) => {
   try {
-    const categories = await prisma.category.findMany();
-    // Categories rarely change — cache for longer
-    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600');
+    const categories = await prisma.category.findMany({
+      orderBy: { name: 'asc' }
+    });
+    // Reduced cache so newly added categories appear on the shop page
+    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
     res.json({ results: categories });
   } catch (error) {
     console.error(error);

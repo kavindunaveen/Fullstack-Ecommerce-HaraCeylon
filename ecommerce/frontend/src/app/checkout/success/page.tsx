@@ -12,7 +12,7 @@ import {
 import toast from 'react-hot-toast';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
-const BACKEND_URL = API_BASE.replace('/api', '');
+const BACKEND_URL = API_BASE.replace(/\/api\/?$/, '');
 
 function SuccessContent() {
   const searchParams = useSearchParams();

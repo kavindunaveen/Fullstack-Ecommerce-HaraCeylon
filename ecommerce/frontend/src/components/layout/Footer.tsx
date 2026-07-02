@@ -11,8 +11,10 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-12 lg:gap-8 mb-20">
           
           <div className="lg:col-span-5 flex flex-col items-start">
-            <Link href="/" className="inline-block mb-6">
-              <img src="/logo.png" alt="HARA CEYLON" className="h-16 w-auto" />
+            <Link href="/" className="inline-block mb-6 group">
+              <h1 className="font-serif text-3xl font-black tracking-tight text-white transition-colors group-hover:text-brand-gold">
+                HARA <span className="text-brand-gold italic font-light group-hover:text-white transition-colors">CEYLON</span>
+              </h1>
             </Link>
             <p className="text-gray-400 font-light leading-relaxed max-w-md mb-8">
               Cultivating wellness and tradition, from the misty hills of Sri Lanka straight to your cherished daily ritual.

@@ -5,7 +5,8 @@
 import axios from 'axios';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
-export const BACKEND_URL = API_BASE.replace('/api', '');
+// Safely remove the /api suffix at the end of the string
+export const BACKEND_URL = API_BASE.replace(/\/api\/?$/, '');
 
 const api = axios.create({
   baseURL: API_BASE,

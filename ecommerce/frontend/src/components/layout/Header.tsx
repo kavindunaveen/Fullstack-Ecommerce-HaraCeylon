@@ -149,7 +149,6 @@ export default function Header() {
             </button>
           </div>
 
-          {/* Logo */}
           <Link href="/" className="flex-shrink-0 relative group">
             <h1 className={`font-serif text-xl md:text-3xl font-black tracking-tight transition-colors ${isHome && !scrolled ? 'text-white' : 'text-brand-dark'}`}>
               HARA <span className="text-brand-gold italic font-light">CEYLON</span>

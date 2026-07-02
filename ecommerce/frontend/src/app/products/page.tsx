@@ -9,7 +9,7 @@ async function fetchProductsData(searchQuery: string) {
 
     const [productsRes, categoriesRes] = await Promise.all([
       fetch(url.toString(), { next: { revalidate: 30 } }),
-      fetch(`${API_URL}/products/categories`, { next: { revalidate: 3600 } })
+      fetch(`${API_URL}/products/categories`, { next: { revalidate: 30 } })
     ]);
 
     const productsData = productsRes.ok ? await productsRes.json() : { results: [] };

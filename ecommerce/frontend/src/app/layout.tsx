@@ -8,6 +8,7 @@ import CartDrawer from '@/components/cart/CartDrawer';
 import CartHydrator from '@/components/cart/CartHydrator';
 import MobileNav from '@/components/layout/MobileNav';
 import { Toaster } from 'react-hot-toast';
+import { headers } from 'next/headers';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -26,20 +27,28 @@ export const metadata: Metadata = {
   title: { default: 'HARA Ceylon — Premium Tea & Coffee from Sri Lanka', template: '%s | HARA Ceylon' },
   description: 'Discover premium organic teas and coffees from the highlands of Sri Lanka. Single-origin, 100% natural, shipped worldwide.',
   keywords: ['HARA Ceylon', 'Ceylon tea', 'Sri Lanka coffee', 'organic tea', 'premium coffee', 'international shipping'],
+  icons: {
+    icon: '/logo.png',
+    apple: '/logo.png',
+  },
   openGraph: { type: 'website', locale: 'en_GB', siteName: 'HARA Ceylon' },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const headersList = await headers();
+  const pathname = headersList.get('x-pathname') || '';
+  const isAdmin = pathname.startsWith('/admin');
+
   return (
     <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
       <body>
         <Providers>
-          <Header />
-          <CartHydrator />
+          {!isAdmin && <Header />}
+          {!isAdmin && <CartHydrator />}
           <main>{children}</main>
-          <Footer />
-          <CartDrawer />
-          <MobileNav />
+          {!isAdmin && <Footer />}
+          {!isAdmin && <CartDrawer />}
+          {!isAdmin && <MobileNav />}
           <Toaster position="bottom-right" toastOptions={{ style: { fontFamily: 'Inter, sans-serif', fontSize: '0.875rem' } }} />
         </Providers>
       </body>

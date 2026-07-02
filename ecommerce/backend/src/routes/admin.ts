@@ -223,12 +223,12 @@ router.post('/products', authenticate, requireAdmin, async (req: AuthRequest, re
         slug,
         description,
         basePrice: Number(basePrice),
-        effectivePrice: Number(effectivePrice),
-        stock: Number(stock),
-        categoryId,
-        isFeatured: Boolean(isFeatured),
-        isNewArrival: Boolean(isNewArrival),
-        isBestSeller: Boolean(isBestSeller),
+        effectivePrice: Number(effectivePrice || basePrice),
+        stock: Number(stock) || 0,
+        categoryId: categoryId || null,
+        isFeatured: isFeatured === true || isFeatured === 'true',
+        isNewArrival: isNewArrival === true || isNewArrival === 'true',
+        isBestSeller: isBestSeller === true || isBestSeller === 'true',
         images: imageUrl ? { create: [{ imageUrl, isMain: true }] } : undefined
       }
     });
@@ -253,12 +253,12 @@ router.put('/products/:id', authenticate, requireAdmin, async (req: AuthRequest,
         slug,
         description,
         basePrice: Number(basePrice),
-        effectivePrice: Number(effectivePrice),
-        stock: Number(stock),
-        categoryId,
-        isFeatured: Boolean(isFeatured),
-        isNewArrival: Boolean(isNewArrival),
-        isBestSeller: Boolean(isBestSeller),
+        effectivePrice: Number(effectivePrice || basePrice),
+        stock: Number(stock) || 0,
+        categoryId: categoryId || null,
+        isFeatured: isFeatured === true || isFeatured === 'true',
+        isNewArrival: isNewArrival === true || isNewArrival === 'true',
+        isBestSeller: isBestSeller === true || isBestSeller === 'true',
       }
     });
 
@@ -504,6 +504,68 @@ router.post('/upload', authenticate, requireAdmin, upload.single('image'), async
     res.json({ imageUrl });
   } catch (error: any) {
     res.status(500).json({ error: error.message || 'Upload failed' });
+  }
+});
+
+// ── Category Management ─────────────────────────────────────
+
+// List all categories (admin)
+router.get('/categories', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const categories = await prisma.category.findMany({
+      orderBy: { name: 'asc' },
+      include: { _count: { select: { products: true } } }
+    });
+    res.json({ categories });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch categories' });
+  }
+});
+
+// Create category
+router.post('/categories', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const { name, slug, description } = req.body;
+    if (!name || !slug) return res.status(400).json({ error: 'Name and slug are required' });
+
+    const existing = await prisma.category.findUnique({ where: { slug } });
+    if (existing) return res.status(400).json({ error: 'A category with this slug already exists' });
+
+    const category = await prisma.category.create({
+      data: { name, slug, description }
+    });
+    res.status(201).json(category);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to create category' });
+  }
+});
+
+// Update category
+router.put('/categories/:id', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const id = req.params.id as string;
+    const { name, slug, description } = req.body;
+    const category = await prisma.category.update({
+      where: { id },
+      data: { name, slug, description }
+    });
+    res.json(category);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update category' });
+  }
+});
+
+// Delete category
+router.delete('/categories/:id', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const id = req.params.id as string;
+    await prisma.category.delete({ where: { id } });
+    res.json({ message: 'Category deleted' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to delete category' });
   }
 });
 

@@ -150,12 +150,11 @@ export default function ProductForm() {
             <div className="form-group">
               <label className="form-label">Category</label>
               <select 
-                required
                 value={formData.categoryId}
                 onChange={e => setFormData({ ...formData, categoryId: e.target.value })}
                 className="form-control"
               >
-                <option value="">Select Category</option>
+                <option value="">Select Category (optional)</option>
                 {categories.map(c => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}

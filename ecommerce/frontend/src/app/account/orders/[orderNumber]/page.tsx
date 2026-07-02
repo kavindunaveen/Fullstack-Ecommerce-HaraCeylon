@@ -12,7 +12,7 @@ import Image from 'next/image';
 import toast from 'react-hot-toast';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-const BACKEND_URL = API_BASE.replace('/api', '');
+const BACKEND_URL = API_BASE.replace(/\/api\/?$/, '');
 
 const formatStatus = (s: string) =>
   s?.replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase()) || '';

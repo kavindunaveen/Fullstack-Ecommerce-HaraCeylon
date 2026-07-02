@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, ShoppingBag, Package, Settings, Users, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Package, Settings, Users, ArrowLeft, Tag } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated } = useAuthStore();
@@ -27,6 +27,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
     { label: 'Orders', href: '/admin/orders', icon: ShoppingBag },
     { label: 'Products', href: '/admin/products', icon: Package },
+    { label: 'Categories', href: '/admin/categories', icon: Tag },
     { label: 'Customers', href: '/admin/customers', icon: Users },
     { label: 'Settings', href: '/admin/settings', icon: Settings },
   ];

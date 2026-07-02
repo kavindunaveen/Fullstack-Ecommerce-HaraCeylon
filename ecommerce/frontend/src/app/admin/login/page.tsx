@@ -44,7 +44,7 @@ function AdminLoginContent() {
         
         <div className="text-center mb-10">
           <div className="w-16 h-16 bg-brand-dark rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg rotate-3">
-             <img src="/logo.webp" alt="" className="w-10 h-10 object-contain invert brightness-0" />
+            <Lock size={28} className="text-brand-gold -rotate-3" />
           </div>
           <h1 className="text-2xl font-serif font-black text-brand-dark">Management Login</h1>
           <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">Secure Administrator Portal</p>

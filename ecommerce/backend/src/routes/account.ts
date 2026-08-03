@@ -2,6 +2,7 @@ import { Router } from 'express';
 import prisma from '../prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { toAbsoluteUrl } from '../utils';
+import bcrypt from 'bcryptjs';
 
 const router = Router();
 
@@ -52,6 +53,44 @@ router.patch('/user/', authenticate, async (req: AuthRequest, res): Promise<any>
   }
 });
 
+router.patch('/password/', authenticate, async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const { current_password, new_password } = req.body;
+    
+    if (!new_password || new_password.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters long' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // For users registered via Google (no password), current_password check is optional or handled differently.
+    // Assuming they must have a password to change it, or they can set one if they don't have one.
+    if (user.passwordHash) {
+      if (!current_password) {
+        return res.status(400).json({ error: 'Current password is required' });
+      }
+      const isValid = await bcrypt.compare(current_password, user.passwordHash);
+      if (!isValid) {
+        return res.status(400).json({ error: 'Incorrect current password' });
+      }
+    }
+
+    const passwordHash = await bcrypt.hash(new_password, 12);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash }
+    });
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('Password update error:', error);
+    res.status(500).json({ error: 'Failed to update password' });
+  }
+});
+
 // ── Address Helpers ──────────────────────────────────────────
 
 const formatAddress = (addr: any) => ({
@@ -59,7 +98,7 @@ const formatAddress = (addr: any) => ({
   full_name: `${addr.firstName || ''} ${addr.lastName || ''}`.trim(),
   phone: addr.phone || '',
   address_line_1: addr.street,
-  address_line_2: '',
+  address_line_2: addr.addressLine2 || '',
   city: addr.city,
   state: addr.state || '',
   postal_code: addr.zipCode,
@@ -91,7 +130,7 @@ router.get('/addresses/', authenticate, async (req: AuthRequest, res): Promise<a
 // POST /api/account/addresses/
 router.post('/addresses/', authenticate, async (req: AuthRequest, res): Promise<any> => {
   try {
-    const { full_name, phone, address_line_1, city, state, postal_code, country, is_default } = req.body;
+    const { full_name, phone, address_line_1, address_line_2, city, state, postal_code, country, is_default } = req.body;
     const { firstName, lastName } = splitName(full_name);
 
     if (is_default) {
@@ -105,6 +144,7 @@ router.post('/addresses/', authenticate, async (req: AuthRequest, res): Promise<
         lastName,
         phone: phone || '',
         street: address_line_1,
+        addressLine2: address_line_2,
         city,
         state: state || '',
         zipCode: postal_code,
@@ -123,7 +163,7 @@ router.post('/addresses/', authenticate, async (req: AuthRequest, res): Promise<
 router.patch('/addresses/:id/', authenticate, async (req: AuthRequest, res): Promise<any> => {
   try {
     const id = req.params.id as string;
-    const { full_name, phone, address_line_1, city, state, postal_code, country, is_default } = req.body;
+    const { full_name, phone, address_line_1, address_line_2, city, state, postal_code, country, is_default } = req.body;
     const { firstName, lastName } = splitName(full_name);
 
     const existing = await prisma.address.findUnique({ where: { id } });
@@ -140,7 +180,7 @@ router.patch('/addresses/:id/', authenticate, async (req: AuthRequest, res): Pro
 
     const address = await prisma.address.update({
       where: { id },
-      data: { firstName, lastName, phone: phone || '', street: address_line_1, city, state: state || '', zipCode: postal_code, country: country || 'GB', isDefault: is_default || false },
+      data: { firstName, lastName, phone: phone || '', street: address_line_1, addressLine2: address_line_2, city, state: state || '', zipCode: postal_code, country: country || 'GB', isDefault: is_default || false },
     });
     res.json(formatAddress(address));
   } catch (error) {
@@ -180,7 +220,8 @@ router.get('/orders/', authenticate, async (req: AuthRequest, res): Promise<any>
       order_number: order.orderNumber,
       order_status: order.status,
       created_at: order.createdAt,
-      grand_total: order.totalAmount,
+      grand_total: order.paidAmount ?? order.totalAmount,
+      currency: order.currency,
       items: order.items.map(item => ({
         product_name_snapshot: item.product?.name || 'Unknown Product',
         image_url_snapshot: toAbsoluteUrl(
@@ -216,7 +257,7 @@ router.get('/orders/:orderNumber/', authenticate, async (req: AuthRequest, res):
       order_number: order.orderNumber,
       order_status: order.status,
       created_at: order.createdAt,
-      grand_total: order.totalAmount,
+      grand_total: order.paidAmount ?? order.totalAmount,
       subtotal,
       shipping_total: order.totalAmount - subtotal,
       shipping_method_name: 'Standard Delivery',
@@ -245,6 +286,70 @@ router.get('/orders/:orderNumber/', authenticate, async (req: AuthRequest, res):
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to fetch order' });
+  }
+});
+// ── Wishlist ───────────────────────────────────────────────────
+
+// GET /api/account/wishlist/
+router.get('/wishlist/', authenticate, async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const wishlist = await prisma.wishlistItem.findMany({
+      where: { userId: req.user.id },
+      include: { product: { include: { images: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    
+    res.json(wishlist.map(item => ({
+      id: item.product.id,
+      slug: item.product.slug,
+      name: item.product.name,
+      base_price: item.product.basePrice,
+      effective_price: item.product.effectivePrice,
+      stock: item.product.stock,
+      main_image: item.product.images.find(img => img.isMain) || item.product.images[0] || null,
+    })));
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch wishlist' });
+  }
+});
+
+// POST /api/account/wishlist/
+router.post('/wishlist/', authenticate, async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const { product_id } = req.body;
+    if (!product_id) return res.status(400).json({ error: 'Product ID is required' });
+
+    const existing = await prisma.wishlistItem.findUnique({
+      where: { userId_productId: { userId: req.user.id, productId: product_id } },
+    });
+
+    if (existing) {
+      return res.json({ message: 'Already in wishlist' });
+    }
+
+    await prisma.wishlistItem.create({
+      data: { userId: req.user.id, productId: product_id },
+    });
+
+    res.status(201).json({ message: 'Added to wishlist' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to add to wishlist' });
+  }
+});
+
+// DELETE /api/account/wishlist/:productId/remove/
+router.delete('/wishlist/:productId/remove/', authenticate, async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const { productId } = req.params;
+    await prisma.wishlistItem.deleteMany({
+      where: { userId: req.user.id, productId },
+    });
+    res.json({ message: 'Removed from wishlist' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to remove from wishlist' });
   }
 });
 

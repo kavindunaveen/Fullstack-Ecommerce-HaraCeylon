@@ -2,8 +2,9 @@ import { Router } from 'express';
 import prisma from '../prisma';
 import { authenticate, optionalAuthenticate, AuthRequest } from '../middleware/auth';
 import { DEFAULT_RATES, DOMESTIC_RATES } from './shipping';
-import { toAbsoluteUrl } from '../utils';
+import { toAbsoluteUrl, CURRENCIES } from '../utils';
 import { sendOrderConfirmationEmail } from '../utils/email';
+import bcrypt from 'bcryptjs';
 
 const router = Router();
 
@@ -112,13 +113,37 @@ router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): P
       customer_note,
       payment_method,
       paypal_order_id,
-      save_address
+      save_address,
+      create_account,
+      password
     } = req.body;
 
     const sessionId = req.headers['x-session-id'] as string;
     let cart;
 
     let checkoutUserId = req.user?.id || null;
+
+    // Handle account creation for guests
+    if (!checkoutUserId && create_account && password && billing_email) {
+      const existingUser = await prisma.user.findUnique({ where: { email: billing_email } });
+      if (existingUser) {
+        return res.status(400).json({ error: 'An account with this email already exists' });
+      }
+      
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const [firstName, ...lastNameParts] = (billing_full_name || '').split(' ');
+      const lastName = lastNameParts.join(' ');
+      
+      const newUser = await prisma.user.create({
+        data: {
+          email: billing_email,
+          password: hashedPassword,
+          firstName: firstName || '',
+          lastName: lastName || '',
+        }
+      });
+      checkoutUserId = newUser.id;
+    }
 
     // Try finding by userId first if authenticated
     if (req.user) {
@@ -179,12 +204,14 @@ router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): P
 
     // Get shipping rate price
     let shippingPrice = 0;
+    let shippingMethodName = 'Standard Delivery';
     if (shipping_rate_id) {
       const rateId = parseInt(shipping_rate_id, 10);
       const allRates = [...DEFAULT_RATES, ...DOMESTIC_RATES];
       const selectedRate = allRates.find(r => r.id === rateId);
       if (selectedRate) {
         shippingPrice = parseFloat(selectedRate.price);
+        shippingMethodName = selectedRate.name;
       }
     }
 
@@ -203,37 +230,56 @@ router.post('/checkout/', optionalAuthenticate, async (req: AuthRequest, res): P
 
     const orderNumber = `HARA-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
 
+    const orderCurrency = currency || 'GBP';
+    const rate = CURRENCIES.find(c => c.code === orderCurrency)?.rate || 1;
+    const paidAmount = totalAmount * rate;
+
     const order = await prisma.$transaction(async (tx) => {
       const newOrder = await tx.order.create({
         data: {
           orderNumber,
           userId: checkoutUserId,
+          customerEmail: billing_email || '',
           totalAmount,
-          currency,
+          paidAmount,
+          currency: orderCurrency,
           shippingName: sName,
           shippingAddress: sAddr,
           shippingCity: sCity,
           shippingCountry: sCountry,
           shippingZip: sZip,
+          shippingMethodName,
           paymentMethod: payment_method || 'cod',
           paymentStatus: payment_method === 'paypal' ? 'paid' : 'pending',
           customerNote: customer_note || null,
           items: {
-            create: cart.items.map((item: any) => ({
-              productId: item.productId,
-              quantity: item.quantity,
-              price: item.product.effectivePrice
-            }))
+            create: cart.items.map((item: any) => {
+              const mainImage = item.product.images?.find((img: any) => img.isMain) || item.product.images?.[0];
+              return {
+                productId: item.productId,
+                productNameSnapshot: item.product.name,
+                productImageSnapshot: mainImage?.imageUrl || null,
+                quantity: item.quantity,
+                price: item.product.effectivePrice
+              };
+            })
           }
         }
       });
 
-      // Decrement stock for each item
+      // Decrement stock for each item using atomic check
       for (const item of cart.items) {
-        await tx.product.update({
-          where: { id: item.productId },
+        const updateResult = await tx.product.updateMany({
+          where: { 
+            id: item.productId, 
+            stock: { gte: item.quantity } 
+          },
           data: { stock: { decrement: item.quantity } }
         });
+
+        if (updateResult.count === 0) {
+          throw new Error(`Insufficient stock for ${item.product.name}. It may have just sold out.`);
+        }
       }
 
       // Clear cart

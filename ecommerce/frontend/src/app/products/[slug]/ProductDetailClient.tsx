@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import api, { cartApi } from '@/lib/api';
+import { cartApi, productsApi, accountApi } from '@/lib/api';
 import { ShoppingBag, Heart, ChevronRight, ShieldCheck, Truck, CheckCircle2, Star, Minus, Plus, UserCircle } from 'lucide-react';
 import { useCartStore, useWishlistStore, useCurrencyStore, useAuthStore } from '@/lib/store';
 import toast from 'react-hot-toast';
@@ -43,7 +43,7 @@ export default function ProductDetailClient({ product, allImages }: { product: P
   const { setCart, optimisticAdd, revertCart } = useCartStore();
   const { hasItem, addItem: addWishlist, removeItem: removeWishlist } = useWishlistStore();
   const { formatPrice } = useCurrencyStore();
-  const { user } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
 
   const isWishlisted = hasItem(product.id);
   const inStock = product.stock_quantity > 0;
@@ -85,12 +85,18 @@ export default function ProductDetailClient({ product, allImages }: { product: P
     }
   };
 
-  const toggleWishlist = () => {
+  const toggleWishlist = async () => {
     if (isWishlisted) {
       removeWishlist(product.id);
+      if (isAuthenticated) {
+        try { await accountApi.removeWishlist(product.id); } catch (e) { console.error(e); }
+      }
       toast.success('Removed from wishlist');
     } else {
       addWishlist(product.id);
+      if (isAuthenticated) {
+        try { await accountApi.addWishlist({ product_id: product.id }); } catch (e) { console.error(e); }
+      }
       toast.success('Added to wishlist');
     }
   };
@@ -103,7 +109,7 @@ export default function ProductDetailClient({ product, allImages }: { product: P
     }
     setSubmittingReview(true);
     try {
-      const res = await api.post(`/products/${product.slug}/reviews`, {
+      const res = await productsApi.addReview(product.slug, {
         rating: reviewRating,
         comment: reviewComment
       });

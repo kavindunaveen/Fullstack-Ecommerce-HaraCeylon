@@ -4,13 +4,14 @@
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { accountApi } from './api';
 
 export interface CartItem {
   id: string;
   product: {
     id: string; name: string; slug: string; sku: string;
     price: number; sale_price: number | null; effective_price: number;
-    stock_status: string;
+    stock_status: string; stock_quantity?: number;
     main_image: { image_url: string; alt_text: string } | null;
   };
   quantity: number; unit_price: number; line_total: number;
@@ -85,7 +86,7 @@ export const useCartStore = create<CartState>()((set, get) => ({
           isCartOpen: true,
           cart: {
             id: 'optimistic',
-            currency: 'USD',
+            currency: 'GBP',
             item_count: quantity,
             subtotal: price * quantity,
             items: [],
@@ -140,7 +141,7 @@ interface CurrencyState {
 export const useCurrencyStore = create<CurrencyState>()(
   persist(
     (set, get) => ({
-      currency: 'USD', symbol: '$', rate: 1,
+      currency: 'GBP', symbol: '£', rate: 1,
       setCurrency: (code, symbol, rate) => {
         if (typeof window !== 'undefined') localStorage.setItem('currency', code);
         set({ currency: code, symbol, rate });
@@ -177,26 +178,55 @@ export const useLanguageStore = create<LanguageState>()(
 // ── Wishlist Store ────────────────────────────────────────────
 interface WishlistState {
   items: string[];
-  addItem: (id: string) => void;
-  removeItem: (id: string) => void;
+  addItem: (id: string) => Promise<void>;
+  removeItem: (id: string) => Promise<void>;
   hasItem: (id: string) => boolean;
+  setItems: (ids: string[]) => void;
+  syncWithBackend: () => Promise<void>;
 }
 
 export const useWishlistStore = create<WishlistState>()(
   persist(
     (set, get) => ({
       items: [],
-      addItem: (id) => set((s) => ({ items: [...new Set([...s.items, String(id).trim().toLowerCase()])] })),
-      removeItem: (id) => set((s) => ({ 
-        items: s.items.filter((i: any) => {
-          const itemId = String(typeof i === 'string' ? i : (i.product_id || i.id)).trim().toLowerCase();
-          return itemId !== String(id).trim().toLowerCase();
-        })
-      })),
+      addItem: async (id) => {
+        set((s) => ({ items: [...new Set([...s.items, String(id).trim().toLowerCase()])] }));
+        if (useAuthStore.getState().isAuthenticated) {
+          try { await accountApi.addWishlist({ product_id: id }); } catch (e) { console.error('Failed to sync wishlist add', e); }
+        }
+      },
+      removeItem: async (id) => {
+        set((s) => ({ 
+          items: s.items.filter((i: any) => {
+            const itemId = String(typeof i === 'string' ? i : (i.product_id || i.id)).trim().toLowerCase();
+            return itemId !== String(id).trim().toLowerCase();
+          })
+        }));
+        if (useAuthStore.getState().isAuthenticated) {
+          try { await accountApi.removeWishlist(id); } catch (e) { console.error('Failed to sync wishlist remove', e); }
+        }
+      },
       hasItem: (id) => get().items.some((i: any) => {
         const itemId = String(typeof i === 'string' ? i : (i.product_id || i.id)).trim().toLowerCase();
         return itemId === String(id).trim().toLowerCase();
       }),
+      setItems: (ids) => set({ items: ids.map(id => String(id).trim().toLowerCase()) }),
+      syncWithBackend: async () => {
+        if (!useAuthStore.getState().isAuthenticated) return;
+        try {
+          const res = await accountApi.getWishlist();
+          const backendItems = res.data.map((w: any) => w.product_id);
+          const currentItems = get().items;
+          const merged = [...new Set([...currentItems, ...backendItems])];
+          set({ items: merged.map(id => String(id).trim().toLowerCase()) });
+          // If we had local items not in backend, we should technically push them to backend
+          for (const item of currentItems) {
+            if (!backendItems.includes(item)) {
+              await accountApi.addWishlist({ product_id: item }).catch(() => {});
+            }
+          }
+        } catch (e) { console.error('Failed to sync wishlist', e); }
+      }
     }),
     { name: 'hara-wishlist' }
   )

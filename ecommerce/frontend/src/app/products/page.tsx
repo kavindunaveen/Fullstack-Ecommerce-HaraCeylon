@@ -1,11 +1,12 @@
 import ProductsClient from './ProductsClient';
 
-async function fetchProductsData(searchQuery: string) {
+async function fetchProductsData(searchQuery: string, category: string) {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
   
   try {
     const url = new URL(`${API_URL}/products`);
     if (searchQuery) url.searchParams.append('search', searchQuery);
+    if (category && category !== 'all') url.searchParams.append('category', category);
 
     const [productsRes, categoriesRes] = await Promise.all([
       fetch(url.toString(), { next: { revalidate: 30 } }),
@@ -28,11 +29,12 @@ async function fetchProductsData(searchQuery: string) {
 export default async function ShopPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string }>;
+  searchParams: Promise<{ search?: string, category?: string }>;
 }) {
   const params = await searchParams;
   const searchQuery = params?.search || '';
-  const { products, categories } = await fetchProductsData(searchQuery);
+  const categoryQuery = params?.category || 'all';
+  const { products, categories } = await fetchProductsData(searchQuery, categoryQuery);
 
   return (
     <ProductsClient 

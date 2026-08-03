@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { cartApi } from '@/lib/api';
@@ -18,8 +19,11 @@ interface Product {
   slug: string;
   name: string;
   category_name?: string;
+  category?: { name: string, slug: string };
   effective_price: string | number;
   main_image?: { image_url: string };
+  stock_status?: string;
+  stock_quantity?: number;
 }
 
 interface ProductsClientProps {
@@ -38,16 +42,18 @@ const itemAnim: Variants = {
 };
 
 export default function ProductsClient({ initialProducts, categories, searchQuery }: ProductsClientProps) {
-  const [filter, setFilter] = useState('all');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const filter = searchParams.get('category') || 'all';
+  const [isPending, startTransition] = useTransition();
   const [addingId, setAddingId] = useState<string | null>(null);
 
   const { setCart, optimisticAdd, revertCart, openCart } = useCartStore();
   const { formatPrice } = useCurrencyStore();
 
-  const filteredProducts = initialProducts.filter(p => {
-    if (filter === 'all') return true;
-    return p.category_name?.toLowerCase() === filter.toLowerCase();
-  });
+  // Products are already filtered by the server if category is in URL
+  // But we still apply local filter just in case, though it's redundant now
+  const filteredProducts = initialProducts;
 
   const addToCart = async (e: React.MouseEvent, product: Product) => {
     e.preventDefault();
@@ -123,24 +129,34 @@ export default function ProductsClient({ initialProducts, categories, searchQuer
               {/* Scrollable pill bar — mobile-friendly */}
               <div className="flex gap-2 overflow-x-auto scroll-smooth-touch hide-scrollbar pb-2 md:justify-center">
                 <button
-                  onClick={() => setFilter('all')}
+                  onClick={() => {
+                    startTransition(() => {
+                      router.push('/products', { scroll: false });
+                    });
+                  }}
                   className={`shrink-0 px-4 py-2.5 md:px-8 md:py-3 rounded-full font-semibold text-xs md:text-sm transition-all duration-300 uppercase tracking-wider whitespace-nowrap ${
                     filter === 'all'
                       ? 'bg-brand-dark text-white shadow-md'
                       : 'bg-white text-gray-500 hover:text-gray-900 border border-gray-200 hover:border-gray-300'
                   }`}
+                  disabled={isPending}
                 >
                   All Products
                 </button>
                 {categories.map((cat) => (
                   <button
                     key={cat.slug}
-                    onClick={() => setFilter(cat.name.toLowerCase())}
+                    onClick={() => {
+                      startTransition(() => {
+                        router.push(`/products?category=${cat.slug}`, { scroll: false });
+                      });
+                    }}
                     className={`shrink-0 px-4 py-2.5 md:px-8 md:py-3 rounded-full font-semibold text-xs md:text-sm transition-all duration-300 uppercase tracking-wider whitespace-nowrap ${
-                      filter === cat.name.toLowerCase()
+                      filter === cat.slug
                         ? 'bg-brand-dark text-white shadow-md'
                         : 'bg-white text-gray-500 hover:text-gray-900 border border-gray-200 hover:border-gray-300'
                     }`}
+                    disabled={isPending}
                   >
                     {cat.name}
                   </button>
@@ -186,11 +202,11 @@ export default function ProductsClient({ initialProducts, categories, searchQuer
                       <div className="absolute bottom-3 left-3 right-3 z-20 translate-y-14 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 hidden md:block">
                         <button
                           onClick={(e) => addToCart(e, product)}
-                          disabled={addingId === product.id}
+                          disabled={addingId === product.id || product.stock_status === 'out_of_stock'}
                           className="w-full bg-brand-dark text-white py-3 rounded-2xl text-sm font-medium flex items-center justify-center gap-2 hover:bg-brand-gold transition-colors shadow-lg disabled:opacity-60"
                         >
                           <ShoppingBag size={15} />
-                          {addingId === product.id ? 'Adding…' : 'Add to Bag'}
+                          {product.stock_status === 'out_of_stock' ? 'Out of Stock' : addingId === product.id ? 'Adding…' : 'Add to Bag'}
                         </button>
                       </div>
                     </Link>
@@ -199,11 +215,11 @@ export default function ProductsClient({ initialProducts, categories, searchQuer
                     <div className="md:hidden border-t border-gray-100">
                       <button
                         onClick={(e) => addToCart(e, product)}
-                        disabled={addingId === product.id}
+                        disabled={addingId === product.id || product.stock_status === 'out_of_stock'}
                         className="w-full py-2.5 bg-brand-dark text-white text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-brand-gold transition-colors disabled:opacity-60"
                       >
                         <ShoppingBag size={13} />
-                        {addingId === product.id ? 'Adding…' : 'Add to Bag'}
+                        {product.stock_status === 'out_of_stock' ? 'Out of Stock' : addingId === product.id ? 'Adding…' : 'Add to Bag'}
                       </button>
                     </div>
                   </div>

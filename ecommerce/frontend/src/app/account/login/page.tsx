@@ -180,6 +180,11 @@ function LoginContent() {
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+            <div className="flex justify-end mt-1">
+              <Link href="/account/forgot-password" className="text-xs font-bold text-gray-500 hover:text-brand-dark transition-colors">
+                Forgot Password?
+              </Link>
+            </div>
             <button
               type="submit"
               disabled={loading}

@@ -25,10 +25,10 @@ api.interceptors.request.use((config) => {
     }
 
     // Guest session ID
-    let sessionId = localStorage.getItem('session_id');
+    let sessionId = localStorage.getItem('hara_session_id');
     if (!sessionId) {
-      sessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-      localStorage.setItem('session_id', sessionId);
+      sessionId = crypto.randomUUID();
+      localStorage.setItem('hara_session_id', sessionId);
     }
     config.headers['X-Session-ID'] = sessionId;
 
@@ -73,8 +73,8 @@ export const productsApi = {
   newArrivals: () => api.get('/products/new-arrivals/'),
   bestSellers: () => api.get('/products/best-sellers/'),
   related: (slug: string) => api.get(`/products/${slug}/related/`),
-  reviews: (slug: string) => api.get(`/products/${slug}/reviews/`),
-  addReview: (slug: string, data: object) => api.post(`/products/${slug}/reviews/add/`, data),
+  reviews: (slug: string) => api.get(`/products/${slug}/reviews`),
+  addReview: (slug: string, data: object) => api.post(`/products/${slug}/reviews`, data),
 };
 
 export const categoriesApi = {
@@ -105,6 +105,7 @@ export const checkoutApi = {
 export const accountApi = {
   getUser: () => api.get('/account/user/'),
   updateUser: (data: object) => api.patch('/account/user/', data),
+  updatePassword: (data: object) => api.patch('/account/password/', data),
   getProfile: () => api.get('/account/profile/'),
   updateProfile: (data: object) => api.patch('/account/profile/', data),
   getAddresses: () => api.get('/account/addresses/'),
@@ -113,9 +114,9 @@ export const accountApi = {
   deleteAddress: (id: string) => api.delete(`/account/addresses/${id}/`),
   getOrders: () => api.get('/account/orders/'),
   getOrder: (orderNumber: string) => api.get(`/account/orders/${orderNumber}/`),
-  getWishlist: () => api.get('/products/wishlist/'),
-  addWishlist: (data: object) => api.post('/products/wishlist/', data),
-  removeWishlist: (productId: string) => api.delete(`/products/wishlist/${productId}/remove/`),
+  getWishlist: () => api.get('/account/wishlist/'),
+  addWishlist: (data: object) => api.post('/account/wishlist/', data),
+  removeWishlist: (productId: string) => api.delete(`/account/wishlist/${productId}/remove/`),
 };
 
 export const authApi = {

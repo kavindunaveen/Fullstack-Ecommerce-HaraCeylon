@@ -10,11 +10,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import CurrencySelector from './CurrencySelector';
 
 const CURRENCIES = [
-  { code: 'USD', symbol: '$', rate: 1, name: 'US Dollar' },
-  { code: 'GBP', symbol: '£', rate: 0.79, name: 'British Pound' },
-  { code: 'EUR', symbol: '€', rate: 0.92, name: 'Euro' },
-  { code: 'AUD', symbol: 'A$', rate: 1.51, name: 'Australian Dollar' },
-  { code: 'LKR', symbol: 'Rs', rate: 300, name: 'Sri Lankan Rupee' },
+  { code: 'GBP', symbol: '£', rate: 1, name: 'British Pound' },
+  { code: 'USD', symbol: '$', rate: 1.27, name: 'US Dollar' },
+  { code: 'EUR', symbol: '€', rate: 1.17, name: 'Euro' },
+  { code: 'AUD', symbol: 'A$', rate: 1.95, name: 'Australian Dollar' },
+  { code: 'CAD', symbol: 'C$', rate: 1.72, name: 'Canadian Dollar' },
+  { code: 'LKR', symbol: 'Rs', rate: 385, name: 'Sri Lankan Rupee' },
 ];
 
 export default function Header() {

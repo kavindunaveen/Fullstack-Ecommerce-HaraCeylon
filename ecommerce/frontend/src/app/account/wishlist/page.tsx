@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useWishlistStore, useCartStore, useCurrencyStore } from '@/lib/store';
-import { productsApi, cartApi } from '@/lib/api';
+import { useWishlistStore, useCartStore, useCurrencyStore, useAuthStore } from '@/lib/store';
+import { productsApi, cartApi, accountApi } from '@/lib/api';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Heart, ShoppingBag, Trash2, ArrowRight, Package } from 'lucide-react';
@@ -11,7 +11,9 @@ import { motion } from 'framer-motion';
 export default function WishlistPage() {
   const wishlistIds = useWishlistStore(state => state.items);
   const removeWishlist = useWishlistStore(state => state.removeItem);
+  const setItems = useWishlistStore(state => state.setItems);
   const { setCart, openCart } = useCartStore();
+  const { isAuthenticated } = useAuthStore();
   const { formatPrice } = useCurrencyStore();
   
   const [products, setProducts] = useState<any[]>([]);
@@ -22,8 +24,7 @@ export default function WishlistPage() {
 
   useEffect(() => {
     if (!mounted) return;
-    console.log('Wishlist IDs updated:', wishlistIds);
-    // Normalize IDs (in case of legacy objects or formatting issues)
+
     const normalizedIds = wishlistIds.map((i: any) => 
       String(typeof i === 'string' ? i : (i.product_id || i.id)).trim().toLowerCase()
     );
@@ -36,11 +37,10 @@ export default function WishlistPage() {
 
     productsApi.list({ ids: normalizedIds.join(',') }).then((res) => {
       const data = res.data.results || res.data || [];
-      console.log('Fetched wishlist products:', data.length);
       setProducts(data);
     }).catch(() => toast.error('Failed to load wishlist products'))
       .finally(() => setLoading(false));
-  }, [wishlistIds, mounted]);
+  }, [wishlistIds.length, mounted]);
 
   const addToCart = async (product: any) => {
     // Open cart and toast immediately — don't wait for API
@@ -113,10 +113,16 @@ export default function WishlistPage() {
                           <h3 className="font-serif font-bold text-brand-dark hover:text-brand-gold transition-colors line-clamp-1">{product.name}</h3>
                         </Link>
                         <button 
-                          onClick={() => {
-                            console.log('Removing product ID:', product.id);
+                          onClick={async () => {
                             removeWishlist(product.id);
                             setProducts(prev => prev.filter(p => p.id !== product.id));
+                            if (isAuthenticated) {
+                              try {
+                                await accountApi.removeWishlist(product.id);
+                              } catch (e) {
+                                console.error(e);
+                              }
+                            }
                             toast.success('Removed from favorites');
                           }}
                           className="text-gray-300 hover:text-red-500 transition-colors p-1"

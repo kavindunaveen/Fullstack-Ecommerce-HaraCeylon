@@ -20,6 +20,7 @@ export default function ProductForm() {
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
+    sku: '',
     description: '',
     basePrice: '',
     effectivePrice: '',
@@ -51,6 +52,7 @@ export default function ProductForm() {
       setFormData({
         name: res.data.name,
         slug: res.data.slug,
+        sku: res.data.sku || '',
         description: res.data.description,
         basePrice: res.data.basePrice.toString(),
         effectivePrice: res.data.effectivePrice.toString(),
@@ -137,13 +139,25 @@ export default function ProductForm() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Slug (URL Path)</label>
-              <input 
-                type="text" required
+              <label className="form-label">Product Slug</label>
+              <input
+                type="text"
+                required
                 value={formData.slug}
-                onChange={e => setFormData({ ...formData, slug: e.target.value })}
+                onChange={e => setFormData({...formData, slug: e.target.value})}
                 className="form-control"
-                placeholder="e.g. premium-ceylon-black"
+                placeholder="e.g. signature-black-tea"
+              />
+            </div>
+            
+            <div className="form-group md:col-span-2">
+              <label className="form-label">SKU (Optional)</label>
+              <input
+                type="text"
+                value={formData.sku}
+                onChange={e => setFormData({...formData, sku: e.target.value})}
+                className="form-control font-mono"
+                placeholder="Leave blank to auto-generate (e.g. HARA-A1B2C3)"
               />
             </div>
 

@@ -264,7 +264,9 @@ export default function AccountPage() {
                       <div className="flex flex-col items-start md:items-end gap-6 w-full md:w-auto shrink-0 pt-6 md:pt-0 border-t md:border-t-0 border-gray-50">
                         <div className="text-left md:text-right">
                           <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Grand Total</p>
-                          <p className="text-3xl font-serif font-black text-brand-dark">{formatPrice(Number(order.grand_total))}</p>
+                          <p className="text-3xl font-serif font-black text-brand-dark">
+                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency || 'GBP' }).format(Number(order.grand_total))}
+                          </p>
                         </div>
                         <Link
                           href={`/account/orders/${order.order_number}`}

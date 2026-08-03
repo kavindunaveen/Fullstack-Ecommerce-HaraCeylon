@@ -71,7 +71,7 @@ function SuccessContent() {
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Date</p>
-                  <p className="font-bold text-gray-700">{new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                  <p className="font-bold text-gray-700">{order?.created_at ? new Date(order.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Loading...'}</p>
                 </div>
               </div>
 
@@ -120,8 +120,7 @@ function SuccessContent() {
                         <span className="text-[10px] font-black uppercase tracking-widest">Method</span>
                       </div>
                       <p className="text-xs font-bold text-brand-dark leading-relaxed">
-                        {order.shipping_method_name}<br />
-                        Standard Delivery
+                        {order.shipping_method_name}
                       </p>
                     </div>
                   </div>

@@ -11,7 +11,14 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState({ first_name: '', last_name: '', email: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
   const [mounted, setMounted] = useState(false);
+  
+  const [passwords, setPasswords] = useState({
+    current_password: '',
+    new_password: '',
+    confirm_password: ''
+  });
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -35,6 +42,31 @@ export default function ProfilePage() {
       toast.error('Failed to update profile');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwords.new_password !== passwords.confirm_password) {
+      toast.error('New passwords do not match');
+      return;
+    }
+    if (passwords.new_password.length < 8) {
+      toast.error('New password must be at least 8 characters');
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      await accountApi.updatePassword({
+        current_password: passwords.current_password,
+        new_password: passwords.new_password
+      });
+      toast.success('Password updated successfully');
+      setPasswords({ current_password: '', new_password: '', confirm_password: '' });
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to update password');
+    } finally {
+      setSavingPassword(false);
     }
   };
 
@@ -138,7 +170,7 @@ export default function ProfilePage() {
                   </div>
 
                   <div className="pt-8 border-t border-gray-100 flex flex-col sm:flex-row gap-4 items-center justify-between">
-                    <p className="text-xs text-gray-400">Manage your password and other settings in the security tab.</p>
+                    <p className="text-xs text-gray-400">Your profile details are public to our team only.</p>
                     <button
                       type="submit"
                       disabled={saving}
@@ -148,6 +180,56 @@ export default function ProfilePage() {
                     </button>
                   </div>
                 </form>
+
+                <div className="mt-12 pt-12 border-t border-gray-100">
+                  <h3 className="text-xl font-bold text-brand-dark mb-8">Security & Password</h3>
+                  <form onSubmit={handlePasswordSubmit} className="space-y-6">
+                    <div className="space-y-3">
+                      <label className="text-[10px] uppercase font-black text-gray-400 tracking-[0.2em] ml-1">Current Password</label>
+                      <input
+                        type="password"
+                        required
+                        value={passwords.current_password}
+                        onChange={(e) => setPasswords({ ...passwords, current_password: e.target.value })}
+                        className="w-full px-6 py-4 rounded-2xl text-brand-dark outline-none bg-gray-50 border border-gray-100 focus:border-brand-gold focus:bg-white focus:ring-4 focus:ring-brand-gold/5 transition-all font-medium"
+                        placeholder="••••••••"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <label className="text-[10px] uppercase font-black text-gray-400 tracking-[0.2em] ml-1">New Password</label>
+                        <input
+                          type="password"
+                          required
+                          value={passwords.new_password}
+                          onChange={(e) => setPasswords({ ...passwords, new_password: e.target.value })}
+                          className="w-full px-6 py-4 rounded-2xl text-brand-dark outline-none bg-gray-50 border border-gray-100 focus:border-brand-gold focus:bg-white focus:ring-4 focus:ring-brand-gold/5 transition-all font-medium"
+                          placeholder="••••••••"
+                        />
+                      </div>
+                      <div className="space-y-3">
+                        <label className="text-[10px] uppercase font-black text-gray-400 tracking-[0.2em] ml-1">Confirm Password</label>
+                        <input
+                          type="password"
+                          required
+                          value={passwords.confirm_password}
+                          onChange={(e) => setPasswords({ ...passwords, confirm_password: e.target.value })}
+                          className="w-full px-6 py-4 rounded-2xl text-brand-dark outline-none bg-gray-50 border border-gray-100 focus:border-brand-gold focus:bg-white focus:ring-4 focus:ring-brand-gold/5 transition-all font-medium"
+                          placeholder="••••••••"
+                        />
+                      </div>
+                    </div>
+                    <div className="pt-4 flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={savingPassword}
+                        className="w-full sm:w-auto bg-gray-900 hover:bg-black text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all duration-500 shadow-xl shadow-black/10 disabled:opacity-50 hover:scale-[1.02] active:scale-95"
+                      >
+                        {savingPassword ? 'Updating...' : 'Update Password'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
               </div>
             </div>
           )}

@@ -12,7 +12,7 @@
  *
  * Payment: COD is default. PayHere is available but requires merchant approval.
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useCartStore, useCurrencyStore, useAuthStore } from '@/lib/store';
 import { checkoutApi, accountApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
@@ -32,7 +32,7 @@ interface ShippingRate {
 
 export default function CheckoutPage() {
   const { cart, setCart } = useCartStore();
-  const { currency, formatPrice } = useCurrencyStore();
+  const { currency, rate, formatPrice } = useCurrencyStore();
   const router = useRouter();
 
   const [form, setForm] = useState({
@@ -59,10 +59,9 @@ export default function CheckoutPage() {
 
     shipping_rate_id: '',
     payment_method: 'paypal',  // Default: PayPal
-    coupon_code: '',
     customer_note: '',
     terms_accepted: false,
-    save_address: true,
+    save_address: false,
     
     // Account Creation
     create_account: false,
@@ -72,12 +71,16 @@ export default function CheckoutPage() {
   const [shippingRates, setShippingRates] = useState<ShippingRate[]>([]);
   const [loadingRates, setLoadingRates] = useState(false);
   const [placingOrder, setPlacingOrder] = useState(false);
-  const [showCoupon, setShowCoupon] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const { user, isAuthenticated } = useAuthStore();
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
 
   // Fetch saved addresses if logged in
+  const paypalOptions = useMemo(() => ({
+    clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "test",
+    currency: currency
+  }), [currency]);
+
   useEffect(() => {
     if (isAuthenticated) {
       accountApi.getAddresses().then((res) => {
@@ -212,6 +215,8 @@ export default function CheckoutPage() {
 
       // Clear cart in store, but preserve the selected currency
       setCart({ id: '', items: [], subtotal: 0, item_count: 0, currency });
+      localStorage.removeItem('hara-cart-last-fetched');
+      localStorage.removeItem('hara-cart-id');
 
       // Handle payment redirect (PayHere) or go to success page
       if (res.data.payment_url) {
@@ -248,7 +253,7 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        <form ref={formRef} onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-10">
 
           {/* ── Left Column: Forms ─────────────────────────── */}
           <div className="lg:col-span-7 space-y-6">
@@ -261,7 +266,7 @@ export default function CheckoutPage() {
                   <div className="relative group">
                     <select
                       onChange={(e) => {
-                        const addr = savedAddresses.find(a => a.id === e.target.value);
+                        const addr = savedAddresses.find(a => a.id === Number(e.target.value));
                         if (addr) applySavedAddress(addr);
                       }}
                       className="text-xs font-bold text-brand-gold bg-brand-gold/5 px-3 py-1.5 rounded-lg outline-none cursor-pointer border border-brand-gold/20 hover:bg-brand-gold/10 transition-all"
@@ -315,29 +320,6 @@ export default function CheckoutPage() {
                 </div>
               </div>
               </div>
-
-            {/* Saved Addresses Selection */}
-            {isAuthenticated && savedAddresses.length > 0 && (
-              <div className="mb-8 bg-brand-dark/5 p-6 rounded-2xl border border-brand-gold/20">
-                <div className="flex items-center gap-3 mb-4 text-brand-dark">
-                  <MapPin size={20} className="text-brand-gold" />
-                  <h3 className="font-bold text-sm uppercase tracking-widest">Use a saved address</h3>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {savedAddresses.map((addr) => (
-                    <button
-                      key={addr.id}
-                      type="button"
-                      onClick={() => applySavedAddress(addr)}
-                      className="text-left p-4 rounded-xl border border-gray-200 bg-white hover:border-brand-gold hover:shadow-md transition-all group"
-                    >
-                      <p className="text-[11px] font-black text-brand-dark mb-1">{addr.full_name}</p>
-                      <p className="text-[10px] text-gray-500 line-clamp-1">{addr.address_line_1}, {addr.city}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Billing / Shipping Address */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
@@ -417,6 +399,7 @@ export default function CheckoutPage() {
                   Ship to a different address
                 </span>
               </label>
+
 
               {/* Separate Shipping Address */}
               {form.ship_to_different_address && (
@@ -517,35 +500,7 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* Coupon Code (collapsible) */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setShowCoupon(v => !v)}
-                className="w-full p-5 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
-              >
-                <span className="flex items-center gap-2 font-semibold text-sm text-gray-700">
-                  <Tag size={16} className="text-brand-gold" /> Have a coupon code?
-                </span>
-                {showCoupon ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
-              </button>
-              {showCoupon && (
-                <div className="px-5 pb-5 border-t border-gray-100">
-                  <div className="flex gap-3 mt-4">
-                    <input
-                      type="text"
-                      name="coupon_code"
-                      value={form.coupon_code}
-                      onChange={handleChange}
-                      placeholder="Enter coupon code"
-                      className="form-control flex-1"
-                      style={{ textTransform: 'uppercase' }}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-400 mt-2">Discount will be applied at checkout.</p>
-                </div>
-              )}
-            </div>
+
 
             {/* Order Notes (collapsible) */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -654,30 +609,31 @@ export default function CheckoutPage() {
               </label>
 
               {/* Place Order Button or PayPal */}
-              {!form.shipping_rate_id || !form.terms_accepted ? (
-                <button
-                  type="submit"
-                  disabled={true}
-                  className="w-full bg-brand-dark text-white py-4 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Complete Form to Pay
-                </button>
-              ) : placingOrder ? (
+              {placingOrder ? (
                 <button disabled className="w-full bg-brand-dark text-white py-4 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl opacity-50 flex items-center justify-center gap-2">
                   <div className="spinner w-4 h-4 border-2 border-white/20 border-t-white" /> Processing…
                 </button>
               ) : (
-                <PayPalScriptProvider key={`${currency}-${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}`} options={{ clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "test", currency: currency }}>
+                <PayPalScriptProvider key={`${currency}-${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}`} options={paypalOptions}>
                   <PayPalButtons
-                    style={{ layout: "vertical" }}
+                    style={{ layout: "vertical", shape: 'pill', color: 'black' }}
                     createOrder={(data, actions) => {
+                      if (!formRef.current?.checkValidity()) {
+                        formRef.current?.reportValidity();
+                        toast.error("Please fill in all required fields first.");
+                        return Promise.reject(new Error("Form validation failed"));
+                      }
+                      if (!form.terms_accepted) {
+                        toast.error("Please accept the terms and conditions to continue.");
+                        return Promise.reject(new Error("Terms not accepted"));
+                      }
                       return actions.order.create({
                         intent: "CAPTURE",
                         purchase_units: [
                           {
                             amount: {
                               currency_code: currency,
-                              value: (grandTotal).toFixed(2),
+                              value: (grandTotal * rate).toFixed(2),
                             },
                           },
                         ],

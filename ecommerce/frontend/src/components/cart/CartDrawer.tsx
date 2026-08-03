@@ -195,7 +195,8 @@ function CartContent({
                     </span>
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                      className="w-9 h-full flex items-center justify-center text-gray-500 hover:text-brand-dark transition-colors font-medium"
+                      disabled={item.quantity >= (item.product?.stock_quantity ?? Infinity)}
+                      className="w-9 h-full flex items-center justify-center text-gray-500 hover:text-brand-dark transition-colors font-medium disabled:opacity-30 disabled:cursor-not-allowed"
                       aria-label="Increase quantity"
                     >
                       +

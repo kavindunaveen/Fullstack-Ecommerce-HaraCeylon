@@ -15,6 +15,8 @@ interface Product {
   category_name?: string;
   effective_price: string | number;
   main_image?: { image_url: string };
+  stock_status?: string;
+  stock_quantity?: number;
 }
 
 const staggerContainer: Variants = {
@@ -203,9 +205,10 @@ export default function HomeClient({ initialProducts }: { initialProducts: Produ
                       <div className="absolute bottom-3 left-3 right-3 z-20 translate-y-14 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 hidden md:block">
                         <button
                           onClick={(e) => addToCart(e, product)}
-                          className="w-full bg-brand-dark text-white py-3 rounded-2xl text-sm font-medium flex items-center justify-center gap-2 hover:bg-brand-gold transition-colors shadow-lg"
+                          disabled={addingId === product.id || product.stock_status === 'out_of_stock'}
+                          className="w-full bg-brand-dark text-white py-3 rounded-2xl text-sm font-medium flex items-center justify-center gap-2 hover:bg-brand-gold transition-colors shadow-lg disabled:opacity-60"
                         >
-                          <ShoppingBag size={15} /> Add to Bag
+                          <ShoppingBag size={15} /> {product.stock_status === 'out_of_stock' ? 'Out of Stock' : 'Add to Bag'}
                         </button>
                       </div>
                     </Link>
@@ -214,11 +217,11 @@ export default function HomeClient({ initialProducts }: { initialProducts: Produ
                     <div className="md:hidden border-t border-gray-100">
                       <button
                         onClick={(e) => addToCart(e, product)}
-                        disabled={addingId === product.id}
+                        disabled={addingId === product.id || product.stock_status === 'out_of_stock'}
                         className="w-full py-2.5 bg-brand-dark text-white text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-brand-gold transition-colors disabled:opacity-60"
                       >
                         <ShoppingBag size={13} />
-                        {addingId === product.id ? 'Adding…' : 'Add to Bag'}
+                        {addingId === product.id ? 'Adding…' : product.stock_status === 'out_of_stock' ? 'Out of Stock' : 'Add to Bag'}
                       </button>
                     </div>
                   </div>

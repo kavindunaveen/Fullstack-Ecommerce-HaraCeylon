@@ -4,8 +4,10 @@ import jwt from 'jsonwebtoken';
 import prisma from '../prisma';
 import path from 'path';
 import multer from 'multer';
+import crypto from 'crypto';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { toAbsoluteUrl } from '../utils';
+import { sendOrderStatusEmail } from '../utils/email';
 
 const router = Router();
 
@@ -46,28 +48,22 @@ const requireAdmin = (req: AuthRequest, res: any, next: any) => {
 router.post('/login', async (req, res): Promise<any> => {
   try {
     const { email, password } = req.body;
-    console.log('Admin login attempt for:', email);
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      console.log('User not found:', email);
       return res.status(401).json({ error: 'Invalid admin credentials' });
     }
     
-    console.log('User found:', user.email, 'Role:', user.role);
-
     if (user.role !== 'ADMIN' || !user.passwordHash) {
-      console.log('User is not admin or has no password hash');
       return res.status(401).json({ error: 'Invalid admin credentials' });
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
-    console.log('Password valid:', valid);
     
     if (!valid) return res.status(401).json({ error: 'Invalid admin credentials' });
 
-    const accessToken = jwt.sign({ userId: user.id }, process.env.JWT_ACCESS_SECRET as string, { expiresIn: '1d' });
+    const accessToken = jwt.sign({ userId: user.id }, process.env.JWT_ACCESS_SECRET as string, { expiresIn: '2h' });
     const refreshToken = jwt.sign({ userId: user.id }, process.env.JWT_REFRESH_SECRET as string, { expiresIn: '7d' });
 
     // Store refresh token
@@ -97,8 +93,10 @@ router.post('/login', async (req, res): Promise<any> => {
   }
 });
 
+router.use(authenticate, requireAdmin);
+
 // Admin Dashboard Stats
-router.get('/stats', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+router.get('/stats', async (req: AuthRequest, res): Promise<any> => {
   try {
     const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
     
@@ -170,7 +168,7 @@ router.get('/stats', authenticate, requireAdmin, async (req: AuthRequest, res): 
 });
 
 // Admin Products List
-router.get('/products', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+router.get('/products', async (req: AuthRequest, res): Promise<any> => {
   try {
     const products = await prisma.product.findMany({
       include: { category: true, images: true },
@@ -193,7 +191,7 @@ router.get('/products', authenticate, requireAdmin, async (req: AuthRequest, res
 });
 
 // Admin Product Detail (by ID)
-router.get('/products/:id', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+router.get('/products/:id', async (req: AuthRequest, res): Promise<any> => {
   try {
     const id = req.params.id as string;
     const product = await prisma.product.findUnique({
@@ -213,14 +211,18 @@ router.get('/products/:id', authenticate, requireAdmin, async (req: AuthRequest,
 });
 
 // Admin Add Product
-router.post('/products', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+router.post('/products', async (req: AuthRequest, res): Promise<any> => {
   try {
-    const { name, slug, description, basePrice, effectivePrice, stock, categoryId, imageUrl, isFeatured, isNewArrival, isBestSeller } = req.body;
+    const { name, slug, sku, description, basePrice, effectivePrice, stock, categoryId, imageUrl, isFeatured, isNewArrival, isBestSeller } = req.body;
+    
+    // Auto-generate SKU if not provided
+    const finalSku = sku ? sku : `HARA-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
     
     const product = await prisma.product.create({
       data: {
         name,
         slug,
+        sku: finalSku,
         description,
         basePrice: Number(basePrice),
         effectivePrice: Number(effectivePrice || basePrice),
@@ -240,10 +242,10 @@ router.post('/products', authenticate, requireAdmin, async (req: AuthRequest, re
 });
 
 // Admin Update Product
-router.put('/products/:id', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+router.put('/products/:id', async (req: AuthRequest, res): Promise<any> => {
   try {
     const id = req.params.id as string;
-    const { name, slug, description, basePrice, effectivePrice, stock, categoryId, imageUrl, isFeatured, isNewArrival, isBestSeller } = req.body;
+    const { name, slug, sku, description, basePrice, effectivePrice, stock, categoryId, imageUrl, isFeatured, isNewArrival, isBestSeller } = req.body;
     
     // Update basic product info
     const product = await prisma.product.update({
@@ -251,6 +253,7 @@ router.put('/products/:id', authenticate, requireAdmin, async (req: AuthRequest,
       data: {
         name,
         slug,
+        sku,
         description,
         basePrice: Number(basePrice),
         effectivePrice: Number(effectivePrice || basePrice),
@@ -287,7 +290,7 @@ router.put('/products/:id', authenticate, requireAdmin, async (req: AuthRequest,
 });
 
 // Admin Export Orders to CSV
-router.get('/orders/export', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+router.get('/orders/export', async (req: AuthRequest, res): Promise<any> => {
   try {
     const orders = await prisma.order.findMany({
       include: {
@@ -323,7 +326,7 @@ router.get('/orders/export', authenticate, requireAdmin, async (req: AuthRequest
 });
 
 // Admin Orders List
-router.get('/orders', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+router.get('/orders', async (req: AuthRequest, res): Promise<any> => {
   try {
     const orders = await prisma.order.findMany({
       include: {
@@ -339,7 +342,7 @@ router.get('/orders', authenticate, requireAdmin, async (req: AuthRequest, res):
 });
 
 // Admin Update Order Status
-router.patch('/orders/:id/status', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+router.patch('/orders/:id/status', async (req: AuthRequest, res): Promise<any> => {
   try {
     const id = req.params.id as string;
     const { status } = req.body;
@@ -348,6 +351,14 @@ router.patch('/orders/:id/status', authenticate, requireAdmin, async (req: AuthR
       where: { id },
       data: { status }
     });
+
+    // Send email notification if shipped or delivered
+    // Assuming schema was updated, but fallback gracefully if customerEmail doesn't exist yet in the types
+    const customerEmail = (order as any).customerEmail;
+    if (customerEmail) {
+      await sendOrderStatusEmail(customerEmail, order.shippingName, order.orderNumber, status);
+    }
+
     res.json(order);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update order status' });
@@ -355,7 +366,7 @@ router.patch('/orders/:id/status', authenticate, requireAdmin, async (req: AuthR
 });
 
 // Admin Delete Product
-router.delete('/products/:id', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+router.delete('/products/:id', async (req: AuthRequest, res): Promise<any> => {
   try {
     const id = req.params.id as string;
     await prisma.product.delete({ where: { id } });
@@ -367,7 +378,7 @@ router.delete('/products/:id', authenticate, requireAdmin, async (req: AuthReque
 });
 
 // Admin Users List
-router.get('/users', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+router.get('/users', async (req: AuthRequest, res): Promise<any> => {
   try {
     const users = await prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
@@ -388,7 +399,7 @@ router.get('/users', authenticate, requireAdmin, async (req: AuthRequest, res): 
 });
 
 // Admin Update User Role
-router.patch('/users/:id/role', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+router.patch('/users/:id/role', async (req: AuthRequest, res): Promise<any> => {
   try {
     const id = req.params.id as string;
     const { role } = req.body;
@@ -409,7 +420,7 @@ router.patch('/users/:id/role', authenticate, requireAdmin, async (req: AuthRequ
 });
 
 // Admin Seed Route (For testing only — requires admin auth)
-router.post('/seed', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+router.post('/seed', async (req: AuthRequest, res): Promise<any> => {
   try {
     const category1 = await prisma.category.upsert({
       where: { slug: 'black-tea' },
@@ -468,7 +479,7 @@ router.post('/seed', authenticate, requireAdmin, async (req: AuthRequest, res): 
 });
 
 // Admin Account Setup (Sets or updates admin password)
-router.post('/setup-account', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+router.post('/setup-account', async (req: AuthRequest, res): Promise<any> => {
   try {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
@@ -495,7 +506,7 @@ router.post('/setup-account', authenticate, requireAdmin, async (req: AuthReques
 });
 
 // Admin Image Upload
-router.post('/upload', authenticate, requireAdmin, upload.single('image'), async (req: any, res): Promise<any> => {
+router.post('/upload', upload.single('image'), async (req: any, res): Promise<any> => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     
@@ -510,7 +521,7 @@ router.post('/upload', authenticate, requireAdmin, upload.single('image'), async
 // ── Category Management ─────────────────────────────────────
 
 // List all categories (admin)
-router.get('/categories', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+router.get('/categories', async (req: AuthRequest, res): Promise<any> => {
   try {
     const categories = await prisma.category.findMany({
       orderBy: { name: 'asc' },
@@ -523,7 +534,7 @@ router.get('/categories', authenticate, requireAdmin, async (req: AuthRequest, r
 });
 
 // Create category
-router.post('/categories', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+router.post('/categories', async (req: AuthRequest, res): Promise<any> => {
   try {
     const { name, slug, description } = req.body;
     if (!name || !slug) return res.status(400).json({ error: 'Name and slug are required' });
@@ -542,7 +553,7 @@ router.post('/categories', authenticate, requireAdmin, async (req: AuthRequest, 
 });
 
 // Update category
-router.put('/categories/:id', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+router.put('/categories/:id', async (req: AuthRequest, res): Promise<any> => {
   try {
     const id = req.params.id as string;
     const { name, slug, description } = req.body;
@@ -558,7 +569,7 @@ router.put('/categories/:id', authenticate, requireAdmin, async (req: AuthReques
 });
 
 // Delete category
-router.delete('/categories/:id', authenticate, requireAdmin, async (req: AuthRequest, res): Promise<any> => {
+router.delete('/categories/:id', async (req: AuthRequest, res): Promise<any> => {
   try {
     const id = req.params.id as string;
     await prisma.category.delete({ where: { id } });

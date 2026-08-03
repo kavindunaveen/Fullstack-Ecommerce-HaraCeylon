@@ -5,8 +5,10 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 import morgan from 'morgan';
 import compression from 'compression';
+import { sendContactFormEmail, sendNewsletterSubscriptionEmail } from './utils/email';
 import prisma from './prisma';
-import { authenticate } from './middleware/auth';
+import { authenticate, optionalAuthenticate, AuthRequest } from './middleware/auth';
+import { CURRENCIES } from './utils';
 
 dotenv.config();
 
@@ -37,6 +39,17 @@ app.use(cors({
 
 app.use(express.json());
 
+// ── CSRF Protection ────────────────────────────────────────────
+app.use((req, res, next) => {
+  // Only check state-mutating requests
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    const origin = req.headers.origin;
+    if (origin && !allowedOrigins.includes(origin)) {
+      return res.status(403).json({ error: 'CSRF Validation Failed: Origin mismatch' });
+    }
+  }
+  next();
+});
 // ── Logging ────────────────────────────────────────────────────
 // Use verbose logging in dev, compact in production (saves CPU + disk I/O)
 if (process.env.NODE_ENV !== 'production') {
@@ -104,6 +117,7 @@ const formatProduct = (p: any, detail = false) => {
   const mainImg = p.images?.find((img: any) => img.isMain) || p.images?.[0] || null;
   const base: any = {
     id: p.id,
+    sku: p.sku || p.id.slice(0, 8),
     slug: p.slug,
     name: p.name,
     category_name: p.category?.name,
@@ -248,6 +262,34 @@ const categoriesHandler = async (req: any, res: any) => {
 app.get('/api/products/categories', categoriesHandler);
 app.get('/api/products/categories/', categoriesHandler);
 
+// ───────────────────────────────────────────────
+// Stub routes — called by frontend but lightweight
+// ───────────────────────────────────────────────
+
+// Currencies list (used by currency switcher)
+app.get('/api/products/currencies', (req, res) => {
+  // Currencies are static — cache for a long time
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.json(CURRENCIES);
+});
+app.get('/api/products/currencies/', (req, res) => res.redirect(301, '/api/products/currencies'));
+
+// Languages list
+app.get('/api/products/languages', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.json([{ code: 'en', name: 'English' }]);
+});
+app.get('/api/products/languages/', (req, res) => res.redirect(301, '/api/products/languages'));
+
+// Brands list (not implemented — return empty)
+app.get('/api/products/brands', (req, res) => res.json({ results: [] }));
+app.get('/api/products/brands/', (req, res) => res.redirect(301, '/api/products/brands'));
+
+// Coupons validate (stub — no discount applied)
+app.post('/api/coupons/validate/', (req, res) => {
+  res.status(400).json({ error: 'Coupon codes are not available at this time.' });
+});
+
 // Product Detail
 app.get('/api/products/:slug', async (req, res): Promise<any> => {
   try {
@@ -314,40 +356,6 @@ app.post('/api/products/:slug/reviews', authenticate, async (req: any, res: any)
   }
 });
 
-// ───────────────────────────────────────────────
-// Stub routes — called by frontend but lightweight
-// ───────────────────────────────────────────────
-
-// Currencies list (used by currency switcher)
-app.get('/api/products/currencies', (req, res) => {
-  // Currencies are static — cache for a long time
-  res.setHeader('Cache-Control', 'public, max-age=3600');
-  res.json([
-    { code: 'GBP', symbol: '£', name: 'British Pound', rate: 1 },
-    { code: 'USD', symbol: '$', name: 'US Dollar', rate: 1.27 },
-    { code: 'EUR', symbol: '€', name: 'Euro', rate: 1.17 },
-    { code: 'LKR', symbol: '₨', name: 'Sri Lankan Rupee', rate: 385 },
-    { code: 'AUD', symbol: 'A$', name: 'Australian Dollar', rate: 1.95 },
-    { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar', rate: 1.72 },
-  ]);
-});
-app.get('/api/products/currencies/', (req, res) => res.redirect(301, '/api/products/currencies'));
-
-// Languages list
-app.get('/api/products/languages', (req, res) => {
-  res.setHeader('Cache-Control', 'public, max-age=3600');
-  res.json([{ code: 'en', name: 'English' }]);
-});
-app.get('/api/products/languages/', (req, res) => res.redirect(301, '/api/products/languages'));
-
-// Brands list (not implemented — return empty)
-app.get('/api/products/brands', (req, res) => res.json({ results: [] }));
-app.get('/api/products/brands/', (req, res) => res.redirect(301, '/api/products/brands'));
-
-// Coupons validate (stub — no discount applied)
-app.post('/api/coupons/validate/', (req, res) => {
-  res.status(400).json({ error: 'Coupon codes are not available at this time.' });
-});
 
 // Static pages (About, Terms, Privacy, Contact)
 const PAGES: Record<string, { title: string; content: string }> = {
@@ -377,17 +385,18 @@ app.get('/api/pages/:slug/', (req, res): any => {
 });
 
 // Contact form submission
-app.post('/api/pages/contact/submit/', (req, res) => {
-  // Log the message server-side; integrate email service later
+app.post('/api/pages/contact/submit/', async (req, res) => {
   const { name, email, message } = req.body;
   console.log(`[Contact Form] From: ${name} <${email}>: ${message}`);
+  await sendContactFormEmail(name, email, message);
   res.json({ message: 'Thank you for your message. We will be in touch shortly.' });
 });
 
 // Newsletter subscription
-app.post('/api/account/newsletter/subscribe/', (req, res) => {
+app.post('/api/account/newsletter/subscribe/', async (req, res) => {
   const { email } = req.body;
   console.log(`[Newsletter] Subscribed: ${email}`);
+  await sendNewsletterSubscriptionEmail(email);
   res.json({ message: 'Successfully subscribed to our newsletter.' });
 });
 

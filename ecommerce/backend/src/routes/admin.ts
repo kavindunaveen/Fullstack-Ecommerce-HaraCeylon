@@ -41,11 +41,16 @@ router.get('/setup', async (req, res): Promise<any> => {
     const email = 'admin@haraceylon.com';
     const password = 'HaraAdmin123!';
     let admin = await prisma.user.findUnique({ where: { email } });
-    if (admin) {
-      await prisma.user.update({ where: { email }, data: { role: 'ADMIN', isVerified: true } });
-      return res.json({ message: 'Admin already existed. Elevated to ADMIN.', email, password });
-    }
     const passwordHash = await bcrypt.hash(password, 10);
+    
+    if (admin) {
+      await prisma.user.update({ 
+        where: { email }, 
+        data: { role: 'ADMIN', isVerified: true, passwordHash } 
+      });
+      return res.json({ message: 'Admin existed. Role elevated and password forcefully reset.', email, password });
+    }
+    
     admin = await prisma.user.create({
       data: {
         email,

@@ -70,6 +70,33 @@ const upload = (0, multer_1.default)({
         cb(new Error('Format not supported. Please upload optimized WebP/JPG/PNG or MP4/WebM videos under 10MB.'));
     }
 });
+// Admin Setup Route (TEMPORARY - hit this in the browser once)
+router.get('/setup', async (req, res) => {
+    try {
+        const email = 'admin@haraceylon.com';
+        const password = 'HaraAdmin123!';
+        let admin = await prisma_1.default.user.findUnique({ where: { email } });
+        if (admin) {
+            await prisma_1.default.user.update({ where: { email }, data: { role: 'ADMIN', isVerified: true } });
+            return res.json({ message: 'Admin already existed. Elevated to ADMIN.', email, password });
+        }
+        const passwordHash = await bcrypt.hash(password, 10);
+        admin = await prisma_1.default.user.create({
+            data: {
+                email,
+                passwordHash,
+                firstName: 'Hara',
+                lastName: 'Admin',
+                role: 'ADMIN',
+                isVerified: true
+            }
+        });
+        res.json({ message: 'New Admin created successfully', email, password });
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 // Middleware to ensure user is an ADMIN
 const requireAdmin = (req, res, next) => {
     if (req.user?.role !== 'ADMIN') {

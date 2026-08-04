@@ -16,6 +16,7 @@ interface Order {
   order_status: string;
   created_at: string;
   grand_total: string | number;
+  currency?: string;
   items?: any[];
 }
 

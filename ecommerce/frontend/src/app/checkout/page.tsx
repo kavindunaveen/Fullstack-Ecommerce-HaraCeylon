@@ -66,7 +66,10 @@ export default function CheckoutPage() {
     // Account Creation
     create_account: false,
     password: '',
+    coupon_code: '',
   });
+
+  const formRef = useRef<HTMLFormElement>(null);
 
   const [shippingRates, setShippingRates] = useState<ShippingRate[]>([]);
   const [loadingRates, setLoadingRates] = useState(false);

@@ -344,7 +344,7 @@ router.delete('/wishlist/:productId/remove/', authenticate, async (req: AuthRequ
   try {
     const { productId } = req.params;
     await prisma.wishlistItem.deleteMany({
-      where: { userId: req.user.id, productId },
+      where: { userId: req.user.id, productId: productId as string },
     });
     res.json({ message: 'Removed from wishlist' });
   } catch (error) {

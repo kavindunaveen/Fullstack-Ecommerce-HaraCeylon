@@ -623,7 +623,7 @@ router.put('/hero-slides/:id', async (req: AuthRequest, res): Promise<any> => {
   try {
     const { title, subtitle, tagline, caption, mediaUrl, mediaType, buttonText, buttonLink, isActive, orderIndex } = req.body;
     const slide = await prisma.heroSlide.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: {
         title,
         subtitle: subtitle || null,
@@ -646,7 +646,7 @@ router.put('/hero-slides/:id', async (req: AuthRequest, res): Promise<any> => {
 // Delete a slide
 router.delete('/hero-slides/:id', async (req: AuthRequest, res): Promise<any> => {
   try {
-    await prisma.heroSlide.delete({ where: { id: req.params.id } });
+    await prisma.heroSlide.delete({ where: { id: req.params.id as string } });
     res.json({ message: 'Slide deleted' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete hero slide' });

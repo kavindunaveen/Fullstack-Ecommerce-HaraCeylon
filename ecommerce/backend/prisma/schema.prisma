@@ -104,6 +104,7 @@ model Product {
   reviews         Review[]
   cartItems       CartItem[]
   orderItems      OrderItem[]
+  wishlistItems   WishlistItem[]
   
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt

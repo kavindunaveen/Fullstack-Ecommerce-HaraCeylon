@@ -296,7 +296,7 @@ export const sendVerificationEmail = async (toEmail: string, token: string) => {
 
   try {
     await getTransporter().sendMail({
-      from: \`"HARA Ceylon" <\${process.env.SMTP_USER}>\`,
+      from: `"HARA Ceylon" <${process.env.SMTP_USER}>`,
       to: toEmail,
       subject: 'Verify your HARA Ceylon account',
       html,

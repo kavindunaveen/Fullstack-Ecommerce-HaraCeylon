@@ -218,3 +218,19 @@ model VerificationToken {
   expiresAt DateTime
   createdAt DateTime @default(now())
 }
+
+model HeroSlide {
+  id          String   @id @default(uuid())
+  title       String
+  subtitle    String?
+  tagline     String?
+  caption     String?
+  mediaUrl    String
+  mediaType   String   @default("image")
+  buttonText  String?  @default("Shop Collection")
+  buttonLink  String?  @default("/products")
+  orderIndex  Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

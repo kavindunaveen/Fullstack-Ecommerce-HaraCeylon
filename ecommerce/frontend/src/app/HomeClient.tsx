@@ -1,12 +1,12 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { cartApi } from '@/lib/api';
 import { ArrowRight, ShoppingBag, Leaf, Droplets, Globe2 } from 'lucide-react';
 import { useCartStore, useCurrencyStore } from '@/lib/store';
 import toast from 'react-hot-toast';
-import { motion, Variants } from 'framer-motion';
+import { motion, Variants, AnimatePresence } from 'framer-motion';
 
 interface Product {
   id: string;
@@ -29,10 +29,19 @@ const itemAnim: Variants = {
   show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100 } }
 };
 
-export default function HomeClient({ initialProducts }: { initialProducts: Product[] }) {
+export default function HomeClient({ initialProducts, initialSlides = [] }: { initialProducts: Product[], initialSlides?: any[] }) {
   const { setCart, optimisticAdd, revertCart } = useCartStore();
   const { formatPrice } = useCurrencyStore();
   const [addingId, setAddingId] = useState<string | null>(null);
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  useEffect(() => {
+    if (!initialSlides?.length) return;
+    const interval = setInterval(() => {
+      setCurrentSlide(c => (c + 1) % initialSlides.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [initialSlides]);
 
   const addToCart = async (e: React.MouseEvent, product: Product) => {
     e.preventDefault();
@@ -57,73 +66,120 @@ export default function HomeClient({ initialProducts }: { initialProducts: Produ
     <div className="bg-white">
       {/* ── Hero Section ── */}
       <section className="relative h-[100svh] min-h-[580px] flex items-center justify-center overflow-hidden">
-        <Image
-          src="/hero.png"
-          alt="HARA Ceylon Tea Estate"
-          fill
-          priority
-          className="object-cover absolute inset-0 z-0"
-        />
-        <video
-          className="absolute inset-0 w-full h-full object-cover z-0"
-          autoPlay muted loop playsInline
-          preload="none"
-        >
-          <source src="/video2.mp4" type="video/mp4" />
-        </video>
-        <div className="absolute inset-0 bg-gradient-to-t from-brand-dark/90 via-brand-dark/40 to-transparent" />
+        <AnimatePresence mode="wait">
+          {initialSlides.length > 0 ? (
+            <motion.div
+              key={currentSlide}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1 }}
+              className="absolute inset-0 z-0"
+            >
+              {initialSlides[currentSlide].mediaType === 'video' ? (
+                <video
+                  className="absolute inset-0 w-full h-full object-cover"
+                  autoPlay muted loop playsInline
+                  src={process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') + initialSlides[currentSlide].mediaUrl}
+                />
+              ) : (
+                <Image
+                  src={process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') + initialSlides[currentSlide].mediaUrl}
+                  alt={initialSlides[currentSlide].title}
+                  fill
+                  priority
+                  className="object-cover absolute inset-0"
+                />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-brand-dark/90 via-brand-dark/40 to-transparent" />
+            </motion.div>
+          ) : (
+            <motion.div key="fallback" className="absolute inset-0 z-0">
+              <Image src="/hero.png" alt="HARA Ceylon Tea Estate" fill priority className="object-cover absolute inset-0" />
+              <video className="absolute inset-0 w-full h-full object-cover" autoPlay muted loop playsInline>
+                <source src="/video2.mp4" type="video/mp4" />
+              </video>
+              <div className="absolute inset-0 bg-gradient-to-t from-brand-dark/90 via-brand-dark/40 to-transparent" />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="relative z-10 container max-w-5xl mx-auto px-5 text-center mt-16 md:mt-20">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7 }}
-            className="inline-flex items-center gap-2.5 px-5 py-2 rounded-full bg-white/90 backdrop-blur-md shadow-xl shadow-black/10 mb-6 border border-white/50"
-          >
-            <Leaf size={13} className="text-brand-gold fill-brand-gold/20" />
-            <span className="text-brand-dark text-[10px] md:text-[11px] font-black tracking-[0.25em] uppercase">
-              100% <span className="text-brand-gold">Organic</span> Ceylon
-            </span>
-          </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.15 }}
-            className="text-[2.6rem] leading-[1.1] sm:text-5xl md:text-7xl lg:text-8xl font-serif text-white mb-5 md:mb-6 tracking-tight"
-          >
-            The Purest Taste <br /> <span className="text-brand-gold italic font-light">of Nature</span>
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
-            className="text-gray-200 text-base md:text-xl font-light max-w-2xl mx-auto mb-8 md:mb-10 leading-relaxed px-2"
-          >
-            Elevate your daily ritual with our sustainably sourced, single-origin teas and coffees from the misty highlands of Sri Lanka.
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.45 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4 sm:px-0"
-          >
-            <Link
-              href="/products"
-              className="btn-modern bg-brand-gold text-white px-8 py-4 rounded-full font-semibold tracking-wide flex items-center gap-2 hover:bg-white hover:text-brand-dark group w-full sm:w-auto justify-center shadow-2xl shadow-brand-gold/20 text-sm md:text-base"
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentSlide}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.5 }}
+              className="flex flex-col items-center"
             >
-              Shop Collection <ArrowRight size={17} className="transition-transform group-hover:translate-x-1" />
-            </Link>
-            <Link
-              href="#story"
-              className="px-8 py-4 rounded-full text-white font-medium hover:bg-white/10 transition-colors w-full sm:w-auto justify-center flex text-sm md:text-base border border-white/20"
-            >
-              Discover Our Story
-            </Link>
-          </motion.div>
+              <div className="inline-flex items-center gap-2.5 px-5 py-2 rounded-full bg-white/90 backdrop-blur-md shadow-xl shadow-black/10 mb-6 border border-white/50">
+                <Leaf size={13} className="text-brand-gold fill-brand-gold/20" />
+                <span className="text-brand-dark text-[10px] md:text-[11px] font-black tracking-[0.25em] uppercase">
+                  {initialSlides.length > 0 ? (
+                    <>
+                      {initialSlides[currentSlide].tagline?.split(' ').map((word: string, i: number, arr: string[]) => (
+                        <span key={i} className={i === 1 ? 'text-brand-gold' : ''}>
+                          {word}{i !== arr.length - 1 ? ' ' : ''}
+                        </span>
+                      ))}
+                    </>
+                  ) : (
+                    <>100% <span className="text-brand-gold">Organic</span> Ceylon</>
+                  )}
+                </span>
+              </div>
+
+              <h1 className="text-[2.6rem] leading-[1.1] sm:text-5xl md:text-7xl lg:text-8xl font-serif text-white mb-5 md:mb-6 tracking-tight">
+                {initialSlides.length > 0 ? (
+                  <>
+                    {initialSlides[currentSlide].title} <br /> 
+                    {initialSlides[currentSlide].subtitle && (
+                      <span className="text-brand-gold italic font-light">{initialSlides[currentSlide].subtitle}</span>
+                    )}
+                  </>
+                ) : (
+                  <>The Purest Taste <br /> <span className="text-brand-gold italic font-light">of Nature</span></>
+                )}
+              </h1>
+
+              <p className="text-gray-200 text-base md:text-xl font-light max-w-2xl mx-auto mb-8 md:mb-10 leading-relaxed px-2">
+                {initialSlides.length > 0 ? initialSlides[currentSlide].caption : 'Elevate your daily ritual with our sustainably sourced, single-origin teas and coffees from the misty highlands of Sri Lanka.'}
+              </p>
+
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4 sm:px-0">
+                <Link
+                  href={initialSlides.length > 0 ? (initialSlides[currentSlide].buttonLink || '/products') : '/products'}
+                  className="btn-modern bg-brand-gold text-white px-8 py-4 rounded-full font-semibold tracking-wide flex items-center gap-2 hover:bg-white hover:text-brand-dark group w-full sm:w-auto justify-center shadow-2xl shadow-brand-gold/20 text-sm md:text-base"
+                >
+                  {initialSlides.length > 0 ? (initialSlides[currentSlide].buttonText || 'Shop Collection') : 'Shop Collection'} 
+                  <ArrowRight size={17} className="transition-transform group-hover:translate-x-1" />
+                </Link>
+                <Link
+                  href="#story"
+                  className="px-8 py-4 rounded-full text-white font-medium hover:bg-white/10 transition-colors w-full sm:w-auto justify-center flex text-sm md:text-base border border-white/20"
+                >
+                  Discover Our Story
+                </Link>
+              </div>
+            </motion.div>
+          </AnimatePresence>
         </div>
+        
+        {/* Slide Indicators */}
+        {initialSlides.length > 1 && (
+          <div className="absolute bottom-10 left-0 right-0 z-20 flex justify-center gap-2">
+            {initialSlides.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentSlide(idx)}
+                className={`w-2 h-2 rounded-full transition-all duration-300 ${currentSlide === idx ? 'w-8 bg-brand-gold' : 'bg-white/50 hover:bg-white/80'}`}
+                aria-label={`Go to slide ${idx + 1}`}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* ── Features Ribbon ── */}

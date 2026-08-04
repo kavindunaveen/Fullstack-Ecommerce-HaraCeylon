@@ -67,6 +67,19 @@ if (!fs.existsSync(uploadsDir)) {
 // Serve uploaded files
 app.use('/uploads', express.static(uploadsDir));
 
+// Get active hero slides
+app.get('/api/hero-slides', async (req, res): Promise<any> => {
+  try {
+    const slides = await prisma.heroSlide.findMany({
+      where: { isActive: true },
+      orderBy: { orderIndex: 'asc' }
+    });
+    res.json(slides);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch hero slides' });
+  }
+});
+
 import authRoutes from './routes/auth';
 import cartRoutes from './routes/cart';
 import orderRoutes from './routes/orders';

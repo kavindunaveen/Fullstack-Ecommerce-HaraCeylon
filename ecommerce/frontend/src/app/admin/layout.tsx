@@ -29,6 +29,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { label: 'Products', href: '/admin/products', icon: Package },
     { label: 'Categories', href: '/admin/categories', icon: Tag },
     { label: 'Customers', href: '/admin/customers', icon: Users },
+    { label: 'Hero Slides', href: '/admin/hero', icon: LayoutDashboard },
     { label: 'Settings', href: '/admin/settings', icon: Settings },
   ];
 

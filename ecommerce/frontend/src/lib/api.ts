@@ -77,6 +77,42 @@ export const productsApi = {
   addReview: (slug: string, data: object) => api.post(`/products/${slug}/reviews`, data),
 };
 
+export const adminApi = {
+  getStats: () => api.get('/admin/stats'),
+  // Products
+  getProducts: () => api.get('/admin/products'),
+  getProduct: (id: string) => api.get(`/admin/products/${id}`),
+  createProduct: (data: any) => api.post('/admin/products', data),
+  updateProduct: (id: string, data: any) => api.put(`/admin/products/${id}`, data),
+  deleteProduct: (id: string) => api.delete(`/admin/products/${id}`),
+  // Upload
+  uploadImage: (formData: FormData) => api.post('/admin/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  // Orders
+  getOrders: () => api.get('/admin/orders'),
+  exportOrders: () => api.get('/admin/orders/export', { responseType: 'blob' }),
+  updateOrderStatus: (id: string, status: string) => api.patch(`/admin/orders/${id}/status`, { status }),
+  // Users
+  getUsers: () => api.get('/admin/users'),
+  // Categories
+  getCategories: () => api.get('/admin/categories'),
+  createCategory: (data: any) => api.post('/admin/categories', data),
+  updateCategory: (id: string, data: any) => api.put(`/admin/categories/${id}`, data),
+  deleteCategory: (id: string) => api.delete(`/admin/categories/${id}`),
+  
+  // Hero Slides
+  getHeroSlides: () => api.get('/admin/hero-slides'),
+  createHeroSlide: (data: any) => api.post('/admin/hero-slides', data),
+  updateHeroSlide: (id: string, data: any) => api.put(`/admin/hero-slides/${id}`, data),
+  deleteHeroSlide: (id: string) => api.delete(`/admin/hero-slides/${id}`),
+  reorderHeroSlides: (orderedIds: string[]) => api.put('/admin/hero-slides/reorder/batch', { orderedIds }),
+};
+
+export const heroSlidesApi = {
+  list: () => api.get('/hero-slides'),
+};
+
 export const categoriesApi = {
   list: () => api.get('/products/categories/'),
   detail: (slug: string) => api.get(`/products/categories/${slug}/`),

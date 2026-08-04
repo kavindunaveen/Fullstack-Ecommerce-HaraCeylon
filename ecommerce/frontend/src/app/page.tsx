@@ -21,7 +21,22 @@ async function getFeaturedProducts() {
   }
 }
 
+async function getHeroSlides() {
+  try {
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
+    const res = await fetch(`${API_URL}/hero-slides`, { next: { revalidate: 60 } });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
 export default async function Home() {
-  const featuredProducts = await getFeaturedProducts();
-  return <HomeClient initialProducts={featuredProducts} />;
+  const [featuredProducts, heroSlides] = await Promise.all([
+    getFeaturedProducts(),
+    getHeroSlides()
+  ]);
+  
+  return <HomeClient initialProducts={featuredProducts} initialSlides={heroSlides} />;
 }

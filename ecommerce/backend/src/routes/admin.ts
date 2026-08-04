@@ -26,13 +26,13 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit for all files
   fileFilter: (req, file, cb) => {
-    const filetypes = /jpeg|jpg|png|webp/;
+    const filetypes = /jpeg|jpg|png|webp|mp4|webm/;
     const mimetype = filetypes.test(file.mimetype);
     const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
     if (mimetype && extname) return cb(null, true);
-    cb(new Error('Only images are allowed (jpeg, jpg, png, webp)'));
+    cb(new Error('Format not supported. Please upload optimized WebP/JPG/PNG or MP4/WebM videos under 10MB.'));
   }
 });
 
@@ -577,6 +577,100 @@ router.delete('/categories/:id', async (req: AuthRequest, res): Promise<any> => 
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to delete category' });
+  }
+});
+
+// ── Hero Slides CMS ──────────────────────────────────────────
+
+// Get all slides (admin view)
+router.get('/hero-slides', async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const slides = await prisma.heroSlide.findMany({
+      orderBy: { orderIndex: 'asc' }
+    });
+    res.json(slides);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch hero slides' });
+  }
+});
+
+// Create a slide
+router.post('/hero-slides', async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const { title, subtitle, tagline, caption, mediaUrl, mediaType, buttonText, buttonLink, isActive, orderIndex } = req.body;
+    const slide = await prisma.heroSlide.create({
+      data: {
+        title,
+        subtitle: subtitle || null,
+        tagline: tagline || null,
+        caption: caption || null,
+        mediaUrl,
+        mediaType: mediaType || 'image',
+        buttonText: buttonText || 'Shop Collection',
+        buttonLink: buttonLink || '/products',
+        isActive: isActive !== false,
+        orderIndex: Number(orderIndex) || 0,
+      }
+    });
+    res.status(201).json(slide);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create hero slide' });
+  }
+});
+
+// Update a slide
+router.put('/hero-slides/:id', async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const { title, subtitle, tagline, caption, mediaUrl, mediaType, buttonText, buttonLink, isActive, orderIndex } = req.body;
+    const slide = await prisma.heroSlide.update({
+      where: { id: req.params.id },
+      data: {
+        title,
+        subtitle: subtitle || null,
+        tagline: tagline || null,
+        caption: caption || null,
+        mediaUrl,
+        mediaType,
+        buttonText,
+        buttonLink,
+        isActive,
+        orderIndex: Number(orderIndex),
+      }
+    });
+    res.json(slide);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update hero slide' });
+  }
+});
+
+// Delete a slide
+router.delete('/hero-slides/:id', async (req: AuthRequest, res): Promise<any> => {
+  try {
+    await prisma.heroSlide.delete({ where: { id: req.params.id } });
+    res.json({ message: 'Slide deleted' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete hero slide' });
+  }
+});
+
+// Reorder slides
+router.put('/hero-slides/reorder/batch', async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const { orderedIds } = req.body; // Array of slide IDs in the new order
+    if (!Array.isArray(orderedIds)) return res.status(400).json({ error: 'Invalid payload' });
+    
+    // Update each slide's orderIndex inside a transaction
+    await prisma.$transaction(
+      orderedIds.map((id, index) => 
+        prisma.heroSlide.update({
+          where: { id },
+          data: { orderIndex: index }
+        })
+      )
+    );
+    res.json({ message: 'Slides reordered' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to reorder hero slides' });
   }
 });
 

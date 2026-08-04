@@ -63,7 +63,7 @@ const formatCart = async (cartId) => {
                 id: item.product.id,
                 name: item.product.name,
                 slug: item.product.slug,
-                sku: item.product.id.slice(0, 8),
+                sku: item.product.sku || item.product.id.slice(0, 8),
                 price: item.product.basePrice,
                 sale_price: item.product.basePrice !== item.product.effectivePrice ? item.product.effectivePrice : null,
                 effective_price: item.product.effectivePrice,

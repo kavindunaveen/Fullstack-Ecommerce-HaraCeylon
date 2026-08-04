@@ -233,8 +233,8 @@ router.post('/login/', authLimiter, async (req, res): Promise<any> => {
       ...tokens
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Login failed' });
+    console.error(error);
+    res.status(500).json({ error: 'Login failed: ' + (error instanceof Error ? error.message : String(error)) });
   }
 });
 // ── Password Reset ──────────────────────────────────────────────

@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon src/index.ts",
-    "build": "tsc",
+    "build": "prisma generate && prisma db push --accept-data-loss && tsc && ts-node create_admin.ts",
     "start": "node dist/index.js",
     "db:push": "prisma db push",
     "create:admin": "npx ts-node create_admin.ts",

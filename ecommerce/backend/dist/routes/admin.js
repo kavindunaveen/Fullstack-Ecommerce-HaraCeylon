@@ -42,8 +42,10 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma_1 = __importDefault(require("../prisma"));
 const path_1 = __importDefault(require("path"));
 const multer_1 = __importDefault(require("multer"));
+const crypto_1 = __importDefault(require("crypto"));
 const auth_1 = require("../middleware/auth");
 const utils_1 = require("../utils");
+const email_1 = require("../utils/email");
 const router = (0, express_1.Router)();
 // Configure Multer for local storage
 const storage = multer_1.default.diskStorage({
@@ -58,14 +60,14 @@ const storage = multer_1.default.diskStorage({
 });
 const upload = (0, multer_1.default)({
     storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit for all files
     fileFilter: (req, file, cb) => {
-        const filetypes = /jpeg|jpg|png|webp/;
+        const filetypes = /jpeg|jpg|png|webp|mp4|webm/;
         const mimetype = filetypes.test(file.mimetype);
         const extname = filetypes.test(path_1.default.extname(file.originalname).toLowerCase());
         if (mimetype && extname)
             return cb(null, true);
-        cb(new Error('Only images are allowed (jpeg, jpg, png, webp)'));
+        cb(new Error('Format not supported. Please upload optimized WebP/JPG/PNG or MP4/WebM videos under 10MB.'));
     }
 });
 // Middleware to ensure user is an ADMIN
@@ -79,24 +81,19 @@ const requireAdmin = (req, res, next) => {
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        console.log('Admin login attempt for:', email);
         if (!email || !password)
             return res.status(400).json({ error: 'Email and password required' });
         const user = await prisma_1.default.user.findUnique({ where: { email } });
         if (!user) {
-            console.log('User not found:', email);
             return res.status(401).json({ error: 'Invalid admin credentials' });
         }
-        console.log('User found:', user.email, 'Role:', user.role);
         if (user.role !== 'ADMIN' || !user.passwordHash) {
-            console.log('User is not admin or has no password hash');
             return res.status(401).json({ error: 'Invalid admin credentials' });
         }
         const valid = await bcrypt.compare(password, user.passwordHash);
-        console.log('Password valid:', valid);
         if (!valid)
             return res.status(401).json({ error: 'Invalid admin credentials' });
-        const accessToken = jsonwebtoken_1.default.sign({ userId: user.id }, process.env.JWT_ACCESS_SECRET, { expiresIn: '1d' });
+        const accessToken = jsonwebtoken_1.default.sign({ userId: user.id }, process.env.JWT_ACCESS_SECRET, { expiresIn: '2h' });
         const refreshToken = jsonwebtoken_1.default.sign({ userId: user.id }, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
         // Store refresh token
         await prisma_1.default.refreshToken.create({
@@ -121,11 +118,12 @@ router.post('/login', async (req, res) => {
     }
     catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'Login failed' });
+        res.status(500).json({ error: 'Login failed: ' + (error instanceof Error ? error.message : String(error)) });
     }
 });
+router.use(auth_1.authenticate, requireAdmin);
 // Admin Dashboard Stats
-router.get('/stats', auth_1.authenticate, requireAdmin, async (req, res) => {
+router.get('/stats', async (req, res) => {
     try {
         const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
         // Run all queries in parallel for maximum speed
@@ -183,7 +181,7 @@ router.get('/stats', auth_1.authenticate, requireAdmin, async (req, res) => {
     }
 });
 // Admin Products List
-router.get('/products', auth_1.authenticate, requireAdmin, async (req, res) => {
+router.get('/products', async (req, res) => {
     try {
         const products = await prisma_1.default.product.findMany({
             include: { category: true, images: true },
@@ -204,7 +202,7 @@ router.get('/products', auth_1.authenticate, requireAdmin, async (req, res) => {
     }
 });
 // Admin Product Detail (by ID)
-router.get('/products/:id', auth_1.authenticate, requireAdmin, async (req, res) => {
+router.get('/products/:id', async (req, res) => {
     try {
         const id = req.params.id;
         const product = await prisma_1.default.product.findUnique({
@@ -224,21 +222,24 @@ router.get('/products/:id', auth_1.authenticate, requireAdmin, async (req, res) 
     }
 });
 // Admin Add Product
-router.post('/products', auth_1.authenticate, requireAdmin, async (req, res) => {
+router.post('/products', async (req, res) => {
     try {
-        const { name, slug, description, basePrice, effectivePrice, stock, categoryId, imageUrl, isFeatured, isNewArrival, isBestSeller } = req.body;
+        const { name, slug, sku, description, basePrice, effectivePrice, stock, categoryId, imageUrl, isFeatured, isNewArrival, isBestSeller } = req.body;
+        // Auto-generate SKU if not provided
+        const finalSku = sku ? sku : `HARA-${crypto_1.default.randomBytes(3).toString('hex').toUpperCase()}`;
         const product = await prisma_1.default.product.create({
             data: {
                 name,
                 slug,
+                sku: finalSku,
                 description,
                 basePrice: Number(basePrice),
-                effectivePrice: Number(effectivePrice),
-                stock: Number(stock),
-                categoryId,
-                isFeatured: Boolean(isFeatured),
-                isNewArrival: Boolean(isNewArrival),
-                isBestSeller: Boolean(isBestSeller),
+                effectivePrice: Number(effectivePrice || basePrice),
+                stock: Number(stock) || 0,
+                categoryId: categoryId || null,
+                isFeatured: isFeatured === true || isFeatured === 'true',
+                isNewArrival: isNewArrival === true || isNewArrival === 'true',
+                isBestSeller: isBestSeller === true || isBestSeller === 'true',
                 images: imageUrl ? { create: [{ imageUrl, isMain: true }] } : undefined
             }
         });
@@ -250,24 +251,25 @@ router.post('/products', auth_1.authenticate, requireAdmin, async (req, res) => 
     }
 });
 // Admin Update Product
-router.put('/products/:id', auth_1.authenticate, requireAdmin, async (req, res) => {
+router.put('/products/:id', async (req, res) => {
     try {
         const id = req.params.id;
-        const { name, slug, description, basePrice, effectivePrice, stock, categoryId, imageUrl, isFeatured, isNewArrival, isBestSeller } = req.body;
+        const { name, slug, sku, description, basePrice, effectivePrice, stock, categoryId, imageUrl, isFeatured, isNewArrival, isBestSeller } = req.body;
         // Update basic product info
         const product = await prisma_1.default.product.update({
             where: { id },
             data: {
                 name,
                 slug,
+                sku,
                 description,
                 basePrice: Number(basePrice),
-                effectivePrice: Number(effectivePrice),
-                stock: Number(stock),
-                categoryId,
-                isFeatured: Boolean(isFeatured),
-                isNewArrival: Boolean(isNewArrival),
-                isBestSeller: Boolean(isBestSeller),
+                effectivePrice: Number(effectivePrice || basePrice),
+                stock: Number(stock) || 0,
+                categoryId: categoryId || null,
+                isFeatured: isFeatured === true || isFeatured === 'true',
+                isNewArrival: isNewArrival === true || isNewArrival === 'true',
+                isBestSeller: isBestSeller === true || isBestSeller === 'true',
             }
         });
         // If a new imageUrl is provided, we can either add it or update the main one
@@ -295,7 +297,7 @@ router.put('/products/:id', auth_1.authenticate, requireAdmin, async (req, res) 
     }
 });
 // Admin Export Orders to CSV
-router.get('/orders/export', auth_1.authenticate, requireAdmin, async (req, res) => {
+router.get('/orders/export', async (req, res) => {
     try {
         const orders = await prisma_1.default.order.findMany({
             include: {
@@ -328,7 +330,7 @@ router.get('/orders/export', auth_1.authenticate, requireAdmin, async (req, res)
     }
 });
 // Admin Orders List
-router.get('/orders', auth_1.authenticate, requireAdmin, async (req, res) => {
+router.get('/orders', async (req, res) => {
     try {
         const orders = await prisma_1.default.order.findMany({
             include: {
@@ -344,7 +346,7 @@ router.get('/orders', auth_1.authenticate, requireAdmin, async (req, res) => {
     }
 });
 // Admin Update Order Status
-router.patch('/orders/:id/status', auth_1.authenticate, requireAdmin, async (req, res) => {
+router.patch('/orders/:id/status', async (req, res) => {
     try {
         const id = req.params.id;
         const { status } = req.body;
@@ -352,6 +354,12 @@ router.patch('/orders/:id/status', auth_1.authenticate, requireAdmin, async (req
             where: { id },
             data: { status }
         });
+        // Send email notification if shipped or delivered
+        // Assuming schema was updated, but fallback gracefully if customerEmail doesn't exist yet in the types
+        const customerEmail = order.customerEmail;
+        if (customerEmail) {
+            await (0, email_1.sendOrderStatusEmail)(customerEmail, order.shippingName, order.orderNumber, status);
+        }
         res.json(order);
     }
     catch (error) {
@@ -359,7 +367,7 @@ router.patch('/orders/:id/status', auth_1.authenticate, requireAdmin, async (req
     }
 });
 // Admin Delete Product
-router.delete('/products/:id', auth_1.authenticate, requireAdmin, async (req, res) => {
+router.delete('/products/:id', async (req, res) => {
     try {
         const id = req.params.id;
         await prisma_1.default.product.delete({ where: { id } });
@@ -371,7 +379,7 @@ router.delete('/products/:id', auth_1.authenticate, requireAdmin, async (req, re
     }
 });
 // Admin Users List
-router.get('/users', auth_1.authenticate, requireAdmin, async (req, res) => {
+router.get('/users', async (req, res) => {
     try {
         const users = await prisma_1.default.user.findMany({
             orderBy: { createdAt: 'desc' },
@@ -392,7 +400,7 @@ router.get('/users', auth_1.authenticate, requireAdmin, async (req, res) => {
     }
 });
 // Admin Update User Role
-router.patch('/users/:id/role', auth_1.authenticate, requireAdmin, async (req, res) => {
+router.patch('/users/:id/role', async (req, res) => {
     try {
         const id = req.params.id;
         const { role } = req.body;
@@ -411,7 +419,7 @@ router.patch('/users/:id/role', auth_1.authenticate, requireAdmin, async (req, r
     }
 });
 // Admin Seed Route (For testing only — requires admin auth)
-router.post('/seed', auth_1.authenticate, requireAdmin, async (req, res) => {
+router.post('/seed', async (req, res) => {
     try {
         const category1 = await prisma_1.default.category.upsert({
             where: { slug: 'black-tea' },
@@ -466,7 +474,7 @@ router.post('/seed', auth_1.authenticate, requireAdmin, async (req, res) => {
     }
 });
 // Admin Account Setup (Sets or updates admin password)
-router.post('/setup-account', auth_1.authenticate, requireAdmin, async (req, res) => {
+router.post('/setup-account', async (req, res) => {
     try {
         const { email, password } = req.body;
         if (!email || !password)
@@ -491,7 +499,7 @@ router.post('/setup-account', auth_1.authenticate, requireAdmin, async (req, res
     }
 });
 // Admin Image Upload
-router.post('/upload', auth_1.authenticate, requireAdmin, upload.single('image'), async (req, res) => {
+router.post('/upload', upload.single('image'), async (req, res) => {
     try {
         if (!req.file)
             return res.status(400).json({ error: 'No file uploaded' });
@@ -501,6 +509,156 @@ router.post('/upload', auth_1.authenticate, requireAdmin, upload.single('image')
     }
     catch (error) {
         res.status(500).json({ error: error.message || 'Upload failed' });
+    }
+});
+// ── Category Management ─────────────────────────────────────
+// List all categories (admin)
+router.get('/categories', async (req, res) => {
+    try {
+        const categories = await prisma_1.default.category.findMany({
+            orderBy: { name: 'asc' },
+            include: { _count: { select: { products: true } } }
+        });
+        res.json({ categories });
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to fetch categories' });
+    }
+});
+// Create category
+router.post('/categories', async (req, res) => {
+    try {
+        const { name, slug, description } = req.body;
+        if (!name || !slug)
+            return res.status(400).json({ error: 'Name and slug are required' });
+        const existing = await prisma_1.default.category.findUnique({ where: { slug } });
+        if (existing)
+            return res.status(400).json({ error: 'A category with this slug already exists' });
+        const category = await prisma_1.default.category.create({
+            data: { name, slug, description }
+        });
+        res.status(201).json(category);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to create category' });
+    }
+});
+// Update category
+router.put('/categories/:id', async (req, res) => {
+    try {
+        const id = req.params.id;
+        const { name, slug, description } = req.body;
+        const category = await prisma_1.default.category.update({
+            where: { id },
+            data: { name, slug, description }
+        });
+        res.json(category);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to update category' });
+    }
+});
+// Delete category
+router.delete('/categories/:id', async (req, res) => {
+    try {
+        const id = req.params.id;
+        await prisma_1.default.category.delete({ where: { id } });
+        res.json({ message: 'Category deleted' });
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to delete category' });
+    }
+});
+// ── Hero Slides CMS ──────────────────────────────────────────
+// Get all slides (admin view)
+router.get('/hero-slides', async (req, res) => {
+    try {
+        const slides = await prisma_1.default.heroSlide.findMany({
+            orderBy: { orderIndex: 'asc' }
+        });
+        res.json(slides);
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to fetch hero slides' });
+    }
+});
+// Create a slide
+router.post('/hero-slides', async (req, res) => {
+    try {
+        const { title, subtitle, tagline, caption, mediaUrl, mediaType, buttonText, buttonLink, isActive, orderIndex } = req.body;
+        const slide = await prisma_1.default.heroSlide.create({
+            data: {
+                title,
+                subtitle: subtitle || null,
+                tagline: tagline || null,
+                caption: caption || null,
+                mediaUrl,
+                mediaType: mediaType || 'image',
+                buttonText: buttonText || 'Shop Collection',
+                buttonLink: buttonLink || '/products',
+                isActive: isActive !== false,
+                orderIndex: Number(orderIndex) || 0,
+            }
+        });
+        res.status(201).json(slide);
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to create hero slide' });
+    }
+});
+// Update a slide
+router.put('/hero-slides/:id', async (req, res) => {
+    try {
+        const { title, subtitle, tagline, caption, mediaUrl, mediaType, buttonText, buttonLink, isActive, orderIndex } = req.body;
+        const slide = await prisma_1.default.heroSlide.update({
+            where: { id: req.params.id },
+            data: {
+                title,
+                subtitle: subtitle || null,
+                tagline: tagline || null,
+                caption: caption || null,
+                mediaUrl,
+                mediaType,
+                buttonText,
+                buttonLink,
+                isActive,
+                orderIndex: Number(orderIndex),
+            }
+        });
+        res.json(slide);
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to update hero slide' });
+    }
+});
+// Delete a slide
+router.delete('/hero-slides/:id', async (req, res) => {
+    try {
+        await prisma_1.default.heroSlide.delete({ where: { id: req.params.id } });
+        res.json({ message: 'Slide deleted' });
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to delete hero slide' });
+    }
+});
+// Reorder slides
+router.put('/hero-slides/reorder/batch', async (req, res) => {
+    try {
+        const { orderedIds } = req.body; // Array of slide IDs in the new order
+        if (!Array.isArray(orderedIds))
+            return res.status(400).json({ error: 'Invalid payload' });
+        // Update each slide's orderIndex inside a transaction
+        await prisma_1.default.$transaction(orderedIds.map((id, index) => prisma_1.default.heroSlide.update({
+            where: { id },
+            data: { orderIndex: index }
+        })));
+        res.json({ message: 'Slides reordered' });
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to reorder hero slides' });
     }
 });
 exports.default = router;

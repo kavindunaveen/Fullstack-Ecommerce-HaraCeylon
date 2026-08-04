@@ -7,8 +7,10 @@ const express_1 = require("express");
 const google_auth_library_1 = require("google-auth-library");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const crypto_1 = __importDefault(require("crypto"));
 const prisma_1 = __importDefault(require("../prisma"));
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
+const email_1 = require("../utils/email");
 const router = (0, express_1.Router)();
 const client = new google_auth_library_1.OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 // Rate limiter for authentication routes
@@ -57,9 +59,13 @@ router.post('/google/', authLimiter, async (req, res) => {
                     email,
                     firstName: given_name || '',
                     lastName: family_name || '',
+                    isVerified: true,
                     // passwordHash is now optional and omitted for Google users
                 }
             });
+        }
+        else if (!user.isVerified) {
+            await prisma_1.default.user.update({ where: { id: user.id }, data: { isVerified: true } });
         }
         // Generate our system's access & refresh tokens
         const tokens = await generateTokens(user.id);
@@ -77,7 +83,7 @@ router.post('/google/', authLimiter, async (req, res) => {
     }
     catch (error) {
         console.error('Google auth error:', error);
-        res.status(500).json({ error: 'Google authentication failed', details: error.message, stack: error.stack });
+        res.status(500).json({ error: 'Google authentication failed', details: error.message });
     }
 });
 // Refresh Token
@@ -142,22 +148,38 @@ router.post('/registration/', authLimiter, async (req, res) => {
                 role: 'CUSTOMER',
             }
         });
-        const tokens = await generateTokens(user.id);
+        const verificationToken = crypto_1.default.randomBytes(32).toString('hex');
+        await prisma_1.default.verificationToken.create({
+            data: {
+                token: verificationToken,
+                userId: user.id,
+                expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+            }
+        });
+        await (0, email_1.sendVerificationEmail)(user.email, verificationToken);
         res.status(201).json({
-            user: {
-                id: user.id,
-                email: user.email,
-                first_name: user.firstName,
-                last_name: user.lastName,
-                role: user.role,
-                is_staff: false,
-            },
-            ...tokens
+            message: 'Registration successful. Please check your email to verify your account.'
         });
     }
     catch (error) {
         console.error('Registration error:', error);
         res.status(500).json({ error: 'Registration failed' });
+    }
+});
+// ── Email Verification ─────────────────────────────────────
+router.post('/verify/', authLimiter, async (req, res) => {
+    try {
+        const { token } = req.body;
+        const vToken = await prisma_1.default.verificationToken.findUnique({ where: { token } });
+        if (!vToken || vToken.expiresAt < new Date()) {
+            return res.status(400).json({ error: 'Invalid or expired verification token' });
+        }
+        await prisma_1.default.user.update({ where: { id: vToken.userId }, data: { isVerified: true } });
+        await prisma_1.default.verificationToken.delete({ where: { token } });
+        res.json({ message: 'Account verified successfully' });
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Verification failed' });
     }
 });
 // ── Email / Password Login ─────────────────────────────────
@@ -176,6 +198,9 @@ router.post('/login/', authLimiter, async (req, res) => {
         if (!valid) {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
+        if (!user.isVerified) {
+            return res.status(403).json({ error: 'Please verify your email address before logging in' });
+        }
         const tokens = await generateTokens(user.id);
         res.json({
             user: {
@@ -190,8 +215,64 @@ router.post('/login/', authLimiter, async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ error: 'Login failed' });
+        console.error(error);
+        res.status(500).json({ error: 'Login failed: ' + (error instanceof Error ? error.message : String(error)) });
+    }
+});
+// ── Password Reset ──────────────────────────────────────────────
+router.post('/password/reset/', authLimiter, async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email)
+            return res.status(400).json({ error: 'Email is required' });
+        const user = await prisma_1.default.user.findUnique({ where: { email } });
+        if (!user) {
+            // Return success even if user not found for security (prevent email enumeration)
+            return res.json({ message: 'If that email is in our database, we will send you a link to reset your password.' });
+        }
+        // Generate token
+        const token = crypto_1.default.randomBytes(32).toString('hex');
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+        await prisma_1.default.passwordResetToken.create({
+            data: { token, userId: user.id, expiresAt }
+        });
+        const frontendUrl = process.env.CORS_ORIGINS?.split(',')[0] || 'http://localhost:3000';
+        const resetUrl = `${frontendUrl}/account/reset-password?token=${token}`;
+        await (0, email_1.sendPasswordResetEmail)(user.email, resetUrl);
+        res.json({ message: 'If that email is in our database, we will send you a link to reset your password.' });
+    }
+    catch (error) {
+        console.error('Password reset request error:', error);
+        res.status(500).json({ error: 'Failed to process request' });
+    }
+});
+router.post('/password/reset/confirm/', authLimiter, async (req, res) => {
+    try {
+        const { token, password } = req.body;
+        if (!token || !password)
+            return res.status(400).json({ error: 'Token and new password are required' });
+        const resetToken = await prisma_1.default.passwordResetToken.findUnique({
+            where: { token },
+            include: { user: true }
+        });
+        if (!resetToken || resetToken.expiresAt < new Date()) {
+            return res.status(400).json({ error: 'Invalid or expired token' });
+        }
+        const hashedPassword = await bcryptjs_1.default.hash(password, 10);
+        await prisma_1.default.$transaction([
+            prisma_1.default.user.update({
+                where: { id: resetToken.userId },
+                data: { passwordHash: hashedPassword }
+            }),
+            prisma_1.default.passwordResetToken.deleteMany({
+                where: { userId: resetToken.userId }
+            })
+        ]);
+        res.json({ message: 'Password has been reset successfully' });
+    }
+    catch (error) {
+        console.error('Password reset confirm error:', error);
+        res.status(500).json({ error: 'Failed to reset password' });
     }
 });
 exports.default = router;

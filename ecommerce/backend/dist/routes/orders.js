@@ -9,6 +9,7 @@ const auth_1 = require("../middleware/auth");
 const shipping_1 = require("./shipping");
 const utils_1 = require("../utils");
 const email_1 = require("../utils/email");
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const router = (0, express_1.Router)();
 async function verifyPayPalPayment(orderId, expectedAmount, expectedCurrency) {
     const clientId = process.env.PAYPAL_CLIENT_ID;
@@ -79,10 +80,29 @@ async function verifyPayPalPayment(orderId, expectedAmount, expectedCurrency) {
 // Checkout
 router.post('/checkout/', auth_1.optionalAuthenticate, async (req, res) => {
     try {
-        const { billing_full_name, billing_email, billing_phone, billing_address_line_1, billing_address_line_2, billing_city, billing_country, billing_postal_code, billing_state, shipping_full_name, shipping_address_line_1, shipping_address_line_2, shipping_city, shipping_country, shipping_postal_code, ship_to_different_address, currency, shipping_rate_id, customer_note, payment_method, paypal_order_id, save_address } = req.body;
+        const { billing_full_name, billing_email, billing_phone, billing_address_line_1, billing_address_line_2, billing_city, billing_country, billing_postal_code, billing_state, shipping_full_name, shipping_address_line_1, shipping_address_line_2, shipping_city, shipping_country, shipping_postal_code, ship_to_different_address, currency, shipping_rate_id, customer_note, payment_method, paypal_order_id, save_address, create_account, password } = req.body;
         const sessionId = req.headers['x-session-id'];
         let cart;
         let checkoutUserId = req.user?.id || null;
+        // Handle account creation for guests
+        if (!checkoutUserId && create_account && password && billing_email) {
+            const existingUser = await prisma_1.default.user.findUnique({ where: { email: billing_email } });
+            if (existingUser) {
+                return res.status(400).json({ error: 'An account with this email already exists' });
+            }
+            const hashedPassword = await bcryptjs_1.default.hash(password, 10);
+            const [firstName, ...lastNameParts] = (billing_full_name || '').split(' ');
+            const lastName = lastNameParts.join(' ');
+            const newUser = await prisma_1.default.user.create({
+                data: {
+                    email: billing_email,
+                    password: hashedPassword,
+                    firstName: firstName || '',
+                    lastName: lastName || '',
+                }
+            });
+            checkoutUserId = newUser.id;
+        }
         // Try finding by userId first if authenticated
         if (req.user) {
             cart = await prisma_1.default.cart.findUnique({
@@ -134,12 +154,14 @@ router.post('/checkout/', auth_1.optionalAuthenticate, async (req, res) => {
         }
         // Get shipping rate price
         let shippingPrice = 0;
+        let shippingMethodName = 'Standard Delivery';
         if (shipping_rate_id) {
             const rateId = parseInt(shipping_rate_id, 10);
             const allRates = [...shipping_1.DEFAULT_RATES, ...shipping_1.DOMESTIC_RATES];
             const selectedRate = allRates.find(r => r.id === rateId);
             if (selectedRate) {
                 shippingPrice = parseFloat(selectedRate.price);
+                shippingMethodName = selectedRate.name;
             }
         }
         const subtotal = cart.items.reduce((acc, item) => acc + (item.product.effectivePrice * item.quantity), 0);
@@ -154,36 +176,53 @@ router.post('/checkout/', auth_1.optionalAuthenticate, async (req, res) => {
             }
         }
         const orderNumber = `HARA-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+        const orderCurrency = currency || 'GBP';
+        const rate = utils_1.CURRENCIES.find(c => c.code === orderCurrency)?.rate || 1;
+        const paidAmount = totalAmount * rate;
         const order = await prisma_1.default.$transaction(async (tx) => {
             const newOrder = await tx.order.create({
                 data: {
                     orderNumber,
                     userId: checkoutUserId,
+                    customerEmail: billing_email || '',
                     totalAmount,
-                    currency,
+                    paidAmount,
+                    currency: orderCurrency,
                     shippingName: sName,
                     shippingAddress: sAddr,
                     shippingCity: sCity,
                     shippingCountry: sCountry,
                     shippingZip: sZip,
+                    shippingMethodName,
                     paymentMethod: payment_method || 'cod',
                     paymentStatus: payment_method === 'paypal' ? 'paid' : 'pending',
                     customerNote: customer_note || null,
                     items: {
-                        create: cart.items.map((item) => ({
-                            productId: item.productId,
-                            quantity: item.quantity,
-                            price: item.product.effectivePrice
-                        }))
+                        create: cart.items.map((item) => {
+                            const mainImage = item.product.images?.find((img) => img.isMain) || item.product.images?.[0];
+                            return {
+                                productId: item.productId,
+                                productNameSnapshot: item.product.name,
+                                productImageSnapshot: mainImage?.imageUrl || null,
+                                quantity: item.quantity,
+                                price: item.product.effectivePrice
+                            };
+                        })
                     }
                 }
             });
-            // Decrement stock for each item
+            // Decrement stock for each item using atomic check
             for (const item of cart.items) {
-                await tx.product.update({
-                    where: { id: item.productId },
+                const updateResult = await tx.product.updateMany({
+                    where: {
+                        id: item.productId,
+                        stock: { gte: item.quantity }
+                    },
                     data: { stock: { decrement: item.quantity } }
                 });
+                if (updateResult.count === 0) {
+                    throw new Error(`Insufficient stock for ${item.product.name}. It may have just sold out.`);
+                }
             }
             // Clear cart
             await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
